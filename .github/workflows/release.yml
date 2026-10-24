@@ -6,7 +6,7 @@ name: release
 
 on:
   push:
-    branches: [main]
+    branches: [main, otbt-test-build]   # otbt-test-build: a test build, never published
   workflow_dispatch:
     inputs:
       release:
@@ -37,7 +37,10 @@ jobs:
           v=$(tr -d '[:space:]' < VERSION)
           echo "version=$v" >> "$GITHUB_OUTPUT"
           if gh release view "v$v" >/dev/null 2>&1; then exists=1; else exists=0; fi
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.ref_name }}" = "otbt-test-build" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            pub=false
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "build=true" >> "$GITHUB_OUTPUT"
             [ "${{ inputs.release }}" = "true" ] && [ $exists = 0 ] && pub=true || pub=false
           else
