@@ -102,19 +102,29 @@ def start(exe, game_args=()):
     return subprocess.Popen(cmd, cwd=os.path.dirname(exe))
 
 
-def game_started(proc, game_pids, wait_s=GAME_WAIT_S, grace_s=EXIT_GRACE_S, sleep=time.sleep, now=time.monotonic):
-    """Whether BeamMP's launcher got the game going: True as soon as a game process runs (or after wait_s with the
-    launcher still running: wait_for_game then decides); False when the launcher ended without a game."""
-    t0 = now()
+def launcher_running():
+    """Whether any BeamMP launcher runs (Windows tasklist): after a self-update its replacement carries on."""
+    try:
+        r = subprocess.run(["tasklist", "/FI", f"IMAGENAME eq {EXE}", "/FO", "CSV", "/NH"], capture_output=True)
+    except OSError:
+        return False
+    return f'"{EXE.lower()}"' in (r.stdout or b"").decode("utf-8", errors="replace").lower()
+
+
+def game_started(proc, game_pids, wait_s=GAME_WAIT_S, grace_s=EXIT_GRACE_S, sleep=time.sleep, now=time.monotonic,
+                 running=launcher_running):
+    """Whether BeamMP's launcher got the game going: True as soon as a game process runs (or after wait_s with a
+    launcher still running: wait_for_game then decides); False when no BeamMP launcher runs any more (ours ended, and
+    no replacement from a self-update, which relaunches itself and exits) and no game appeared within grace_s."""
+    t0, gone = now(), None
     while now() - t0 < wait_s:
         if game_pids():
             return True
-        if proc.poll() is not None:
-            end = now()
-            while now() - end < grace_s:
-                if game_pids():
-                    return True
-                sleep(1)
+        if proc.poll() is None or running():
+            gone = None
+        elif gone is None:
+            gone = now()
+        elif now() - gone >= grace_s:
             return False
-        sleep(2)
+        sleep(1 if gone is not None else 2)
     return True

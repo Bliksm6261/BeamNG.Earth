@@ -94,11 +94,12 @@ class FakeProc:
 
 
 class GameStartedTest(unittest.TestCase):
-    def run_case(self, proc, game_at=None, **kw):
+    def run_case(self, proc, game_at=None, replacement=None, **kw):
         c = Clock()
         proc.clock = c
         pids = lambda: [1] if game_at is not None and c.t >= game_at else []  # noqa: E731
-        return bl.game_started(proc, pids, sleep=c.sleep, now=c.now, **kw), c.t
+        running = lambda: replacement is not None and replacement[0] <= c.t < replacement[1]  # noqa: E731
+        return bl.game_started(proc, pids, sleep=c.sleep, now=c.now, running=running, **kw), c.t
 
     def test_game_appears(self):
         self.assertEqual(self.run_case(FakeProc(), game_at=20), (True, 20))
@@ -113,3 +114,14 @@ class GameStartedTest(unittest.TestCase):
 
     def test_still_running_after_the_wait(self):
         self.assertEqual(self.run_case(FakeProc(), wait_s=30), (True, 30))
+
+    def test_self_update_replacement_starts_the_game_later(self):
+        # ours exits at 10 after relaunching itself; the replacement runs 11..200 and starts the game at 120
+        ok, t = self.run_case(FakeProc(ends_at=10), game_at=120, replacement=(11, 200))
+        self.assertTrue(ok)
+        self.assertLess(t, 123)
+
+    def test_replacement_ends_without_game(self):
+        ok, t = self.run_case(FakeProc(ends_at=10), replacement=(11, 60))
+        self.assertFalse(ok)
+        self.assertGreaterEqual(t, 60)
