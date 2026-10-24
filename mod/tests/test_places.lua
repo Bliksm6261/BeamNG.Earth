@@ -408,8 +408,8 @@ T.check(#info.spawnPoints == 2 + #l2 and info.spawnPoints[3].objectname == li.PR
   and info.spawnPoints[3].translationId == l2[1].name, 'level info: a spawn point per place, by id, named')
 T.check(info.spawnPoints[3].preview == li.PREVIEW and info.spawnPoints[4].preview:match('^places/'),
   'level info: a place\'s own picture when there is one, else the Earth')
-T.check(info.size[1] * info.size[2] > 5.1e14 and info.size[1] * info.size[2] < 5.102e14,
-  'level info: the Earth\'s surface')
+T.check(info.size[1] > 2.5e6 and info.size[1] < 3.5e6 and info.size[2] > 3.5e6 and info.size[2] < 4e6,
+  'level info: the edition\'s region (Southern Africa\'s box)')
 T.check(li.placeId(li.PREFIX .. '12') == 12 and li.placeId(li.RANDOM) == nil and li.placeId(nil) == nil, 'placeId')
 T.check(not li.previewKey(-33.731908, 150.312007):find('[-.]'), 'preview keys: file-name safe')
 

@@ -5,11 +5,19 @@
 
 return {
   name = 'Off the Beaten Track',
+  title = 'Off the Beaten Track: Southern Africa',     -- the level's and the welcome page's title
+  tagline = 'Overland Southern Africa, the real roads and tracks.',
+  website = 'https://offthebeatentrack.world',
+  color = '#FF9500',        -- the brand's orange (buttons, highlights)
   installUrl = 'https://github.com/Bliksm6261/BeamNG.Earth/releases/latest',
   server = {
     host = '',              -- the edition's BeamMP server (an IP or a host name)
     port = 30814,           -- BeamMP's default
     name = 'Off the Beaten Track',
+  title = 'Off the Beaten Track: Southern Africa',     -- the level's and the welcome page's title
+  tagline = 'Overland Southern Africa, the real roads and tracks.',
+  website = 'https://offthebeatentrack.world',
+  color = '#FF9500',        -- the brand's orange (buttons, highlights)
   },
   autoJoin = true,          -- join server.host as soon as BeamMP is ready (autojoin.lua)
 }

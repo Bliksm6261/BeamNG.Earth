@@ -20,23 +20,24 @@ def pretty(path, obj):
         json.dump(obj, f, indent=2)
         f.write("\n")
 
-# The level select's card: the whole Earth's details as the stock levels have theirs (the same as the mod's
-# levelinfo.lua BASE, which writes this file over again in the user folder with a spawn point per saved place). size:
-# the equator's 40,075 km by 12,728 km, whose product is the Earth's surface (510,072,000 km2).
+# The level select's card: the edition's region (Off the Beaten Track: Southern Africa) as the stock levels have theirs
+# (the same as the mod's levelinfo.lua BASE, which writes this file over again in the user folder with a spawn point per
+# saved place). size: the region's box, ~29 deg of longitude at 18 S by ~34 deg of latitude.
 pretty(os.path.join(L, "info.json"), {
-    "title": "BeamNG.Earth",
-    "description": "The whole Earth, streamed around you by the BeamNG.Earth companion server. Start the server, then "
-                   "pick a place below or teleport from the BeamNG.Earth window. Preview: Sentinel-2 cloudless 2016 by "
-                   "EOX IT Services GmbH (CC BY 4.0).",
+    "title": "Off the Beaten Track: Southern Africa",
+    "description": "Southern Africa at full scale, from Cape Town to the Serengeti, built around you by the Off the "
+                   "Beaten Track app (offthebeatentrack.world, built on BeamNG.Earth). Start the app, then pick a city "
+                   "below or teleport from the map. Preview: Sentinel-2 cloudless 2016 by EOX IT Services GmbH (CC BY "
+                   "4.0).",
     "previews": ["beamng_earth_preview.jpg"],
-    "size": [40075017, 12727986],
-    "biome": "Every biome on Earth: oceans, deserts, rainforests, forests, grasslands, tundra, mountains and ice",
-    "roads": "About 64 million km of roads in every country: motorways, highways, city streets, rural and dirt roads",
-    "suitablefor": "Freeroam, road trips, exploring, off-roading",
-    "features": "The real planet from open data: terrain, roads, bridges, tunnels, buildings, forests, lakes, seas, "
-                "airports and live weather",
-    "country": "Every country",
-    "authors": "BeamNG.Earth",
+    "size": [3070277, 3772300],
+    "biome": "Savanna, bushveld, Kalahari and Namib desert, Drakensberg mountains, Okavango wetlands, coast and lakes",
+    "roads": "Every road in ten countries: highways, city streets, gravel roads, mountain passes and 4x4 tracks",
+    "suitablefor": "Overlanding, 4x4 trails, road trips, exploring, freeroam",
+    "features": "Real terrain, roads, passes, towns and live weather across South Africa, Namibia, Botswana, "
+                "Zimbabwe, Zambia, Mozambique, Lesotho, Eswatini, Malawi and Tanzania",
+    "country": "Southern Africa (10 countries)",
+    "authors": "Off the Beaten Track (built on BeamNG.Earth)",
     "defaultSpawnPointName": "spawn_default",
     "supportsTraffic": True,      # the stock traffic / parked-car choice at the level start (2026-10-14)
     "supportsTimeOfDay": True,
@@ -44,7 +45,7 @@ pretty(os.path.join(L, "info.json"), {
         {"objectname": "spawn_default", "translationId": "Where you left off", "preview": "beamng_earth_preview.jpg",
          "description": "The last place you teleported to."},
         {"objectname": "bne_random", "translationId": "Random location", "preview": "beamng_earth_preview.jpg",
-         "description": "A road somewhere in the world, picked at random each time."},
+         "description": "A road somewhere in Southern Africa, picked at random each time."},
     ],
 })
 

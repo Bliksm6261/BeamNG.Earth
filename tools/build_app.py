@@ -26,7 +26,7 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-NAME = "BeamNG.Earth"
+NAME = "OffTheBeatenTrack"     # the edition's app (file names; ProductName below is the display name)
 IS_WIN = os.name == "nt"
 SEP = ";" if IS_WIN else ":"
 
@@ -37,11 +37,9 @@ def version():
 
 
 def make_icons(work):
-    """icon.png (256 px, the level's preview cropped square) and icon.ico."""
+    """icon.png (256 px, the Off the Beaten Track logo: branding/otbt_app_icon.png) and icon.ico."""
     from PIL import Image
-    im = Image.open(os.path.join(ROOT, "mod", "beamng_earth", "levels", "beamng_earth", "beamng_earth_preview.jpg"))
-    s = min(im.size)
-    im = im.crop(((im.width - s) // 2, (im.height - s) // 2, (im.width + s) // 2, (im.height + s) // 2))
+    im = Image.open(os.path.join(ROOT, "branding", "otbt_app_icon.png"))
     im = im.convert("RGBA").resize((256, 256), Image.LANCZOS)
     png, ico = os.path.join(work, "icon.png"), os.path.join(work, "icon.ico")
     im.save(png)
@@ -64,10 +62,10 @@ def version_files(work, ver):
     (asInvoker, the supported Windows versions, long paths; it adds Common Controls) with the app's identity."""
     v4 = win_version(ver)
     dotted = ".".join(map(str, v4))
-    strings = {"CompanyName": "TecnaGamer", "FileDescription": "BeamNG.Earth launcher and world server",
-               "FileVersion": ver, "InternalName": NAME, "LegalCopyright": "Copyright (c) 2026 TecnaGamer, MIT License",
-               "OriginalFilename": f"{NAME}-{ver}.exe", "ProductName": NAME, "ProductVersion": ver,
-               "Comments": "Drive the real world in BeamNG.drive. https://github.com/TecnaGamer/BeamNG.Earth"}
+    strings = {"CompanyName": "Off the Beaten Track", "FileDescription": "Off the Beaten Track: Southern Africa (BeamNG.Earth launcher and world server)",
+               "FileVersion": ver, "InternalName": NAME, "LegalCopyright": "Copyright (c) 2026 TecnaGamer and Off the Beaten Track, MIT License",
+               "OriginalFilename": f"{NAME}-{ver}.exe", "ProductName": "Off the Beaten Track", "ProductVersion": ver,
+               "Comments": "Overland Southern Africa in BeamNG.drive. https://offthebeatentrack.world, built on https://github.com/TecnaGamer/BeamNG.Earth"}
     vf = os.path.join(work, "version_info.txt")
     with open(vf, "w", encoding="utf-8") as f:
         f.write("VSVersionInfo(\n"
@@ -176,7 +174,7 @@ def appimage(dist, png, out, tool):
                 f'exec "$HERE/usr/lib/{NAME}/{NAME}" "$@"\n')
     os.chmod(os.path.join(appdir, "AppRun"), 0o755)
     with open(os.path.join(appdir, "beamng-earth.desktop"), "w") as f:
-        f.write(f"[Desktop Entry]\nType=Application\nName={NAME}\nComment=Drive the real world in BeamNG.drive\n"
+        f.write(f"[Desktop Entry]\nType=Application\nName=Off the Beaten Track\nComment=Overland Southern Africa in BeamNG.drive\n"
                 "Exec=BeamNG.Earth\nIcon=beamng-earth\nCategories=Game;\nTerminal=false\n")
     shutil.copyfile(png, os.path.join(appdir, "beamng-earth.png"))
     shutil.copyfile(png, os.path.join(appdir, ".DirIcon"))

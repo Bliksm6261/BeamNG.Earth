@@ -55,7 +55,7 @@ from urllib.parse import urlsplit
 log = logging.getLogger("earthd.net")
 
 SERVER_VERSION = "0.4.0"
-PROJECT_URL = "https://github.com/TecnaGamer/BeamNG.Earth"
+PROJECT_URL = "https://github.com/Bliksm6261/BeamNG.Earth"
 USER_AGENT = f"BeamNG.Earth/{SERVER_VERSION} (+{PROJECT_URL})"
 KINDS = ("demand", "prefetch", "background", "predownload", "urgent")
 # "urgent": demand that goes first (the block the player waits on: its base photo). Demand takes a token only while

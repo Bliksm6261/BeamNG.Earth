@@ -723,7 +723,7 @@ class BudgetTest(unittest.TestCase):
 
 class UserAgentTest(unittest.TestCase):
     def test_project_user_agent_and_nothing_personal(self):
-        self.assertEqual(nf.USER_AGENT, f"BeamNG.Earth/{earthd.SERVER_VERSION} (+https://github.com/TecnaGamer/BeamNG.Earth)")
+        self.assertEqual(nf.USER_AGENT, f"BeamNG.Earth/{earthd.SERVER_VERSION} (+https://github.com/Bliksm6261/BeamNG.Earth)")
         f, clock, sleep, tr = fetcher()
         for u in (url(USGS), url(EOX), url(MT), "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/1/0/0.png",
                   "https://api.open-meteo.com/v1/forecast?latitude=1"):
