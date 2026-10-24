@@ -17,7 +17,13 @@ points. Rebuild the region with
 **One app for everything (Windows).** The app gets BeamMP's launcher by itself on first start (from BeamMP's GitHub
 releases, checked against its SHA-256: `beammp_launch.py`), starts the game through it, and the game joins the
 edition's multiplayer server by itself (`autojoin.lua`; the server is set in `edition.lua`: beamng.offthebeatentrack.world, port 30814).
-A player signed out of BeamMP plays as a guest. `--single-player` starts the game without BeamMP.
+A player signed out of BeamMP plays as a guest. `--single-player` starts the game without BeamMP. Players can turn the
+automatic join off on the settings page (Multiplayer).
+
+**Branding.** The app (`OffTheBeatenTrack-<version>.exe` / `.AppImage`), the level card, the welcome page and the
+multiplayer window carry the Off the Beaten Track name and orange (#FF9500; `edition.lua`). Updates and problem reports
+go to this fork (Bliksm6261/BeamNG.Earth), not upstream. The logo is in `branding/` (the app icon and a white version;
+the welcome page carries a small copy inline).
 
 Status: beta (see VERSION). Tested on BeamNG.drive 0.40.3 on Linux (Vulkan) and the Steam Deck. See
 [docs/ROADMAP.md](docs/ROADMAP.md) for what is coming.

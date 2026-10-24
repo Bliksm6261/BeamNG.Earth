@@ -22,23 +22,23 @@ M.PREFIX = 'bne_place_'
 M.PREVIEW = 'beamng_earth_preview.jpg'
 M.PLACE_PREVIEWS = 'places/'           -- per place: <PLACE_PREVIEWS><previewKey>.jpg (the server writes them)
 
--- Earth (stock levels' fields; levelTiles.lua shows size as width x height (area): the equator's 40,075 km by
--- 12,728 km, whose product is the Earth's surface, 510,072,000 km2)
+-- The edition's region (stock levels' fields; levelTiles.lua shows size as width x height (area)). Kept the same as
+-- tools/make_level_assets.py's info.json.
 M.BASE = {
-  title = 'BeamNG.Earth',
-  description = 'The whole Earth, streamed around you by the BeamNG.Earth companion server. Start the server, then '
-    .. 'pick a place below or teleport from the BeamNG.Earth window. Preview: Sentinel-2 cloudless 2016 by EOX IT '
-    .. 'Services GmbH (CC BY 4.0).',
+  title = 'Off the Beaten Track: Southern Africa',
+  description = 'Southern Africa at full scale, from Cape Town to the Serengeti, built around you by the Off the '
+    .. 'Beaten Track app (offthebeatentrack.world, built on BeamNG.Earth). Start the app, then pick a city '
+    .. 'below or teleport from the map. Preview: Sentinel-2 cloudless 2016 by EOX IT Services GmbH (CC BY '
+    .. '4.0).',
   previews = { M.PREVIEW },
-  size = { 40075017, 12727986 },
-  biome = 'Every biome on Earth: oceans, deserts, rainforests, forests, grasslands, tundra, mountains and ice',
-  roads = 'About 64 million km of roads in every country: motorways, highways, city streets, rural and dirt '
-    .. 'roads',
-  suitablefor = 'Freeroam, road trips, exploring, off-roading',
-  features = 'The real planet from open data: terrain, roads, bridges, tunnels, buildings, forests, lakes, seas, '
-    .. 'airports and live weather',
-  country = 'Every country',
-  authors = 'BeamNG.Earth',
+  size = { 3070277, 3772300 },   -- the region's box (region.lua): ~29 deg of longitude at 18 S by ~34 deg of latitude
+  biome = 'Savanna, bushveld, Kalahari and Namib desert, Drakensberg mountains, Okavango wetlands, coast and lakes',
+  roads = 'Every road in ten countries: highways, city streets, gravel roads, mountain passes and 4x4 tracks',
+  suitablefor = 'Overlanding, 4x4 trails, road trips, exploring, freeroam',
+  features = 'Real terrain, roads, passes, towns and live weather across South Africa, Namibia, Botswana, '
+    .. 'Zimbabwe, Zambia, Mozambique, Lesotho, Eswatini, Malawi and Tanzania',
+  country = 'Southern Africa (10 countries)',
+  authors = 'Off the Beaten Track (built on BeamNG.Earth)',
   defaultSpawnPointName = M.DEFAULT,
   supportsTraffic = true,
   supportsTimeOfDay = true,
@@ -60,7 +60,7 @@ function M.build(placeList, hasPreview)
     { objectname = M.DEFAULT, translationId = 'Where you left off', preview = M.PREVIEW,
       description = 'The last place you teleported to.' },
     { objectname = M.RANDOM, translationId = 'Random location', preview = M.PREVIEW,
-      description = 'A road somewhere in the world, picked at random each time.' },
+      description = 'A road somewhere in Southern Africa, picked at random each time.' },
   }
   for _, p in ipairs(placeList or {}) do
     local key = M.previewKey(p.lat, p.lon)

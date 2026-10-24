@@ -568,7 +568,7 @@ def watch_game_log(user_dir, since):
             if MODS_OFF_LINE.encode() in data:
                 problem("BeamNG.drive was updated and turned all mods off, BeamNG.Earth too.",
                         "In the game's main menu, choose to enable your mods again (or Mods > Manage, turn "
-                        "BeamNG.Earth on), then pick Freeroam > BeamNG.Earth. The world server keeps running.")
+                        "BeamNG.Earth on), then pick Freeroam > Off the Beaten Track. The world server keeps running.")
                 return
 
     threading.Thread(target=run, name="watch-game-log", daemon=True).start()
@@ -647,7 +647,7 @@ def windows_console():
             if k32.AllocConsole():
                 sys.stdout = sys.stderr = open("CONOUT$", "w", buffering=1, encoding="utf-8", errors="replace")
                 sys.stdin = open("CONIN$", "r", encoding="utf-8", errors="replace")
-        k32.SetConsoleTitleW("BeamNG.Earth")
+        k32.SetConsoleTitleW("Off the Beaten Track")
     except (OSError, AttributeError):
         pass
 
@@ -868,7 +868,7 @@ def main():
 
 def run(args):
     import install
-    title(f"BeamNG.Earth {install.version()}")
+    title(f"Off the Beaten Track {install.version()} (BeamNG.Earth)")
     wine = under_wine()
     build = "native"
     if args.user_dir:
@@ -904,7 +904,8 @@ def run(args):
     try:
         if args.no_game:
             say()
-            say("Start BeamNG.drive and pick 'BeamNG.Earth' in Freeroam. Ctrl+C stops the server.")
+            say("Start BeamNG.drive and pick 'Off the Beaten Track: Southern Africa' in Freeroam. "
+                "Ctrl+C stops the server.")
             server.wait()
             return
         watch_game_log(user_dir, time.time() - 5)
@@ -939,7 +940,7 @@ def run(args):
             if not multiplayer:
                 proc = start_game(not args.no_gcpatch, build, args.gfx, user_dir)
         say()
-        say("In the game: Freeroam > BeamNG.Earth (with multiplayer: the server is joined by itself).  "
+        say("In the game: Freeroam > Off the Beaten Track (with multiplayer: the server is joined by itself).  "
             "Closing the game stops the server.")
         say()
         wait_for_game(proc)

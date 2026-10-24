@@ -7,11 +7,12 @@ local M = {}
 
 M.RECOMMEND_WAIT_S = 15     -- in our level this long in a BeamMP session with no world generator: the window
 M.INSTALL_URL = require('beamngEarth/edition').installUrl   -- this edition's app (edition.lua)
-M.TITLE = 'This server uses BeamNG.Earth'
-M.TEXT = 'BeamNG.Earth builds the real world around you.<br><br>For the best experience, install the free BeamNG.Earth app: '
+M.TITLE = 'This server uses the Off the Beaten Track app'
+M.TEXT = 'Off the Beaten Track builds Southern Africa around you (made with BeamNG.Earth).<br><br>'
+  .. 'For the best experience, install the free Off the Beaten Track app: '
   .. 'it builds the world on your own PC, so it loads much faster and in full detail. Without it, the world comes from '
   .. 'the server and other players, and can load slowly.'
-M.AFTER_TEXT = 'Install BeamNG.Earth from the page that opened, start it, then rejoin this server.'
+M.AFTER_TEXT = 'Install the Off the Beaten Track app from the page that opened, start it, then rejoin this server.'
 M.SETTING = 'beammpRecommendOff'
 -- BeamMP's HUD apps (chat, session bar, player list) and BeamNG.Earth's in one app layout
 -- (settings/ui_apps/originalLayouts/default/beamngEarthMP.uilayout.json; the user, 2026-10-22: "combine the BeamNG ui
@@ -59,7 +60,7 @@ function M.dialog()
   return { title = M.TITLE, text = M.TEXT, buttons = {
     { label = "Don't show again", luaCallback = string.format(CALL, 'off'), isCancel = false },
     { label = 'Not now', luaCallback = string.format(CALL, 'later'), isCancel = true },
-    { label = 'Get BeamNG.Earth (recommended)', luaCallback = string.format(CALL, 'get'), default = true,
+    { label = 'Get the app (recommended)', luaCallback = string.format(CALL, 'get'), default = true,
       isConfirm = true },
   } }
 end
@@ -68,7 +69,7 @@ end
 function M.onChoice(choice)
   if choice == 'get' then
     M.openInstallPage()
-    guihooks.trigger('showConfirmationDialog', { title = 'BeamNG.Earth', text = M.AFTER_TEXT,
+    guihooks.trigger('showConfirmationDialog', { title = 'Off the Beaten Track', text = M.AFTER_TEXT,
       buttons = { { label = 'OK', luaCallback = '', default = true, isConfirm = true } } })
   elseif choice == 'off' and settingsRef then
     settingsRef.set(M.SETTING, 'true')
