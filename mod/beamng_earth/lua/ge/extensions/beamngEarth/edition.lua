@@ -1,7 +1,7 @@
 -- The edition this build is (the Off the Beaten Track edition of BeamNG.Earth; README): its name, where players get
 -- the app, and the multiplayer server the game joins by itself (autojoin.lua). One file to change for another edition.
 --
--- server.host '' (no server yet): no automatic join; BeamMP's own server list still works.
+-- server.host '' would turn the automatic join off; BeamMP's own server list works either way.
 
 return {
   name = 'Off the Beaten Track',
@@ -11,7 +11,7 @@ return {
   color = '#FF9500',        -- the brand's orange (buttons, highlights)
   installUrl = 'https://github.com/Bliksm6261/BeamNG.Earth/releases/latest',
   server = {
-    host = '',              -- the edition's BeamMP server (an IP or a host name)
+    host = 'beamng.offthebeatentrack.world',   -- the edition's BeamMP server (OTBT's VPS, 156.155.250.124)
     port = 30814,           -- BeamMP's default
     name = 'Off the Beaten Track',
   title = 'Off the Beaten Track: Southern Africa',     -- the level's and the welcome page's title

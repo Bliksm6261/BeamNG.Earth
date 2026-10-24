@@ -16,7 +16,7 @@ points. Rebuild the region with
 
 **One app for everything (Windows).** The app gets BeamMP's launcher by itself on first start (from BeamMP's GitHub
 releases, checked against its SHA-256: `beammp_launch.py`), starts the game through it, and the game joins the
-edition's multiplayer server by itself (`autojoin.lua`; the server is set in `edition.lua`, empty until there is one).
+edition's multiplayer server by itself (`autojoin.lua`; the server is set in `edition.lua`: beamng.offthebeatentrack.world, port 30814).
 A player signed out of BeamMP plays as a guest. `--single-player` starts the game without BeamMP. Players can turn the
 automatic join off on the settings page (Multiplayer).
 

@@ -26,8 +26,13 @@ do
   T.check(settings.validate(aj.SETTING, 'false') == false, 'autoJoin can be switched off')
 end
 
--- the edition ships without a server: never joins
-T.check(edition.server.host == '' and not aj.enabled(nil), 'no server in edition.lua: off')
+-- the edition's own server
+T.check(edition.server.host == 'beamng.offthebeatentrack.world' and edition.server.port == 30814 and aj.enabled(nil),
+  'edition.lua: OTBT\'s server, BeamMP\'s port, on')
+
+-- without a server: never joins
+edition.server.host = ''
+T.check(not aj.enabled(nil), 'no server in edition.lua: off')
 _G.MPCoreNetwork = fakeMP()
 MPCoreNetwork.launcher, MPCoreNetwork.loggedIn = true, true
 run(5, 1)
@@ -105,6 +110,6 @@ aj._reset(); _G.MPCoreNetwork = fakeMP()
 MPCoreNetwork.isLauncherConnected = function() error('boom') end
 T.check(pcall(run, 3, 1), 'a throwing BeamMP call does not throw')
 
-edition.server.host, edition.server.port = '', 30814
+edition.server.host, edition.server.port = 'beamng.offthebeatentrack.world', 30814
 _G.MPCoreNetwork = nil
 T.done('test_autojoin')
