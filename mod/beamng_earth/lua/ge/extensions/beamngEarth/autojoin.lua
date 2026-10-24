@@ -11,7 +11,7 @@ local M = {}
 
 M.LOGIN_WAIT_S = 10         -- s after BeamMP's launcher connects for its own sign-in before playing as a guest
 M.GIVE_UP_S = 300           -- s without BeamMP ready: no join this game start
-M.SETTING = 'autoJoinOff'   -- the player's switch (settings.lua), as beammp.lua's recommendation
+M.SETTING = 'autoJoin'      -- the player's switch (settings.lua SCHEMA, the settings page's Multiplayer)
 
 local edition = require('beamngEarth/edition')
 
@@ -34,8 +34,9 @@ end
 function M.enabled(settings)
   local s = edition.server or {}
   if not edition.autoJoin or type(s.host) ~= 'string' or s.host == '' then return false end
-  local off = settings and type(settings.get) == 'function' and settings.get(M.SETTING)
-  return off ~= true and off ~= 'true'
+  local on = true
+  if settings and type(settings.get) == 'function' then on = settings.get(M.SETTING) end
+  return on ~= false and on ~= 'false'
 end
 
 function M.state() return state end

@@ -16,8 +16,15 @@ local function fakeMP()
   m.connectToServer = function(ip, port, name, skip) m.calls[#m.calls + 1] = { 'connect', ip, port, name, skip } end
   return m
 end
-local function settingsWith(v) return { get = function(k) return k == aj.SETTING and v or nil end } end
+local function settingsWith(v) return { get = function(k) if k == aj.SETTING then return v end end } end
 local function run(n, dt, s) for _ = 1, n do aj.update(dt, s) end end
+
+-- the real settings module has the switch, on by default, and keeps it off
+do
+  local settings = require('beamngEarth/settings')
+  T.check(settings.SCHEMA[aj.SETTING] and settings.defaults()[aj.SETTING] == true, 'autoJoin in settings.lua, on by default')
+  T.check(settings.validate(aj.SETTING, 'false') == false, 'autoJoin can be switched off')
+end
 
 -- the edition ships without a server: never joins
 T.check(edition.server.host == '' and not aj.enabled(nil), 'no server in edition.lua: off')
@@ -74,11 +81,11 @@ T.check(aj.state() == 'done' and #MPCoreNetwork.calls == 0, 'launcher never conn
 -- the player's switch
 aj._reset(); _G.MPCoreNetwork = fakeMP()
 MPCoreNetwork.launcher, MPCoreNetwork.loggedIn = true, true
-run(3, 1, settingsWith('true'))
+run(3, 1, settingsWith(false))
 T.check(aj.state() == 'done' and #MPCoreNetwork.calls == 0, 'switched off by the player: no join')
 aj._reset()
-run(1, 1, settingsWith('false'))
-T.check(#MPCoreNetwork.calls == 1, 'the switch set to false: joins')
+run(1, 1, settingsWith(true))
+T.check(#MPCoreNetwork.calls == 1, 'the switch on: joins')
 
 -- a BeamMP function that throws: logged, not fatal
 aj._reset(); _G.MPCoreNetwork = fakeMP()

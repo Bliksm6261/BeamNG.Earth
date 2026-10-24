@@ -60,6 +60,8 @@ M.SCHEMA = {
   creditsCorner = { kind = 'enum', default = 'bottom-left', values = credits.CORNERS, label = 'Data credits corner' },
   creditsSize = { kind = 'enum', default = 'small', values = { 'small', 'normal' }, label = 'Data credits size' },
   -- the server's download cache (server cache.py): its size cap in GB, sent on every hello and change
+  -- join the edition's multiplayer server by itself (autojoin.lua; edition.lua server.host)
+  autoJoin = { kind = 'bool', default = true, label = 'Join the edition\'s server' },
   cacheCapGb = { kind = 'enum', default = '20', values = { '5', '10', '20', '50', 'unlimited' },
     label = 'Download cache size' },
   devOutlineKm = { kind = 'number', default = 3, min = 0.5, max = 20, label = 'Dev outlines radius (km)' },
@@ -72,7 +74,7 @@ M.SCHEMA = {
 M.ORDER = { 'rebaseDistance', 'viewDistanceMode', 'viewDistanceKm', 'hazeStrength', 'skyMode', 'clouds',
   'weatherMode', 'realGravity', 'groundCover', 'groundCoverDensity', 'roads', 'hudVisible', 'statusBar',
   'placeNamesOnline', 'creditsVisible',
-  'creditsCorner', 'creditsSize', 'cacheCapGb', 'devOutlineKm', 'devMapKm' }
+  'creditsCorner', 'creditsSize', 'autoJoin', 'cacheCapGb', 'devOutlineKm', 'devMapKm' }
 
 -- Stored but not on the settings page
 M.HIDDEN = { welcomeSeen = true, updateDismissed = true }
