@@ -6,6 +6,9 @@ multiplayer mod, and the mod's autojoin.lua joins the edition's server. The play
     ensure(say)       -> find(), else BeamMP's latest release downloaded into our folder and checked against its
                          published SHA-256; None when that fails (the app then starts the game without multiplayer)
     start(exe)        -> Popen of BeamMP's launcher, in its own folder (it keeps its settings and updates there)
+    game_started(proc, game_pids)
+                      -> True once the game runs; False when BeamMP's launcher ends first (a failed update, ...), so
+                         the app starts the game itself
 
 Windows only: BeamMP publishes its launcher for Windows (on Linux players install it themselves). Downloaded from
 BeamMP's GitHub releases, unchanged; BeamMP's launcher then updates itself from BeamMP (it checks its own updates'
@@ -14,12 +17,15 @@ signatures). BeamMP is free software (AGPL-3.0, github.com/BeamMP/BeamMP-Launche
 import hashlib
 import os
 import subprocess
+import time
 import urllib.request
 
 EXE = "BeamMP-Launcher.exe"
 RELEASE = "https://github.com/BeamMP/BeamMP-Launcher/releases/latest/download/"
 URL, SHA_URL = RELEASE + EXE, RELEASE + EXE + ".sha256"
 TIMEOUT_S = 60
+GAME_WAIT_S = 600        # BeamMP's launcher may update itself and its mod first
+EXIT_GRACE_S = 5         # after it ends: the game it just started may not be listed yet
 
 
 def own_dir(data_dir):
@@ -94,3 +100,21 @@ def start(exe, game_args=()):
     """BeamMP's launcher, which starts the game (anything in game_args goes to the game, after its "--")."""
     cmd = [exe] + (["--"] + list(game_args) if game_args else [])
     return subprocess.Popen(cmd, cwd=os.path.dirname(exe))
+
+
+def game_started(proc, game_pids, wait_s=GAME_WAIT_S, grace_s=EXIT_GRACE_S, sleep=time.sleep, now=time.monotonic):
+    """Whether BeamMP's launcher got the game going: True as soon as a game process runs (or after wait_s with the
+    launcher still running: wait_for_game then decides); False when the launcher ended without a game."""
+    t0 = now()
+    while now() - t0 < wait_s:
+        if game_pids():
+            return True
+        if proc.poll() is not None:
+            end = now()
+            while now() - end < grace_s:
+                if game_pids():
+                    return True
+                sleep(1)
+            return False
+        sleep(2)
+    return True

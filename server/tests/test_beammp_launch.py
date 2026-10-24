@@ -72,3 +72,44 @@ class BeamMPLaunchTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Clock:
+    def __init__(self):
+        self.t = 0.0
+
+    def now(self):
+        return self.t
+
+    def sleep(self, s):
+        self.t += s
+
+
+class FakeProc:
+    def __init__(self, ends_at=None):
+        self.ends_at, self.clock = ends_at, None
+
+    def poll(self):
+        return 1 if self.ends_at is not None and self.clock.t >= self.ends_at else None
+
+
+class GameStartedTest(unittest.TestCase):
+    def run_case(self, proc, game_at=None, **kw):
+        c = Clock()
+        proc.clock = c
+        pids = lambda: [1] if game_at is not None and c.t >= game_at else []  # noqa: E731
+        return bl.game_started(proc, pids, sleep=c.sleep, now=c.now, **kw), c.t
+
+    def test_game_appears(self):
+        self.assertEqual(self.run_case(FakeProc(), game_at=20), (True, 20))
+
+    def test_launcher_ends_without_game(self):
+        ok, t = self.run_case(FakeProc(ends_at=10))
+        self.assertFalse(ok)
+        self.assertLess(t, 10 + bl.EXIT_GRACE_S + 2)
+
+    def test_launcher_ends_just_before_the_game_is_listed(self):
+        self.assertTrue(self.run_case(FakeProc(ends_at=10), game_at=12)[0])
+
+    def test_still_running_after_the_wait(self):
+        self.assertEqual(self.run_case(FakeProc(), wait_s=30), (True, 30))
