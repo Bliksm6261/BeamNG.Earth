@@ -55,7 +55,8 @@ mv -f "$DIR/BeamMP-Server.new" "$DIR/BeamMP-Server"
 
 echo "== the edition's server files ($BRANCH)"
 if [ -d "$SRC/.git" ]; then
-  git -C "$SRC" fetch -q origin "$BRANCH" && git -C "$SRC" checkout -q -B "$BRANCH" "origin/$BRANCH"
+  # FETCH_HEAD: the first clone may be a single-branch clone of another BRANCH (no origin/<BRANCH> then)
+  git -C "$SRC" fetch -q --depth 1 origin "$BRANCH" && git -C "$SRC" checkout -q -f -B "$BRANCH" FETCH_HEAD
 else
   git clone -q --depth 1 --branch "$BRANCH" "$REPO" "$SRC"
 fi
