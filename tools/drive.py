@@ -375,7 +375,7 @@ if t then t:delete() end
 local car = getObjectByID(st.carId)
 if car then car:setActive(1); be:enterVehicle(0, car) end
 commands.setGameCamera()
-local ok = car and beamngEarth_core.teleport(st.lat, st.lon)
+local ok = car and beamngEarth_core.teleport(st.lat, st.lon, nil, { anywhere = true })
 BNGE_DRIVE_CAR = nil
 return 'user vehicle ' .. tostring(st.carId) .. ' restored, teleport ' .. tostring(ok)"""
 

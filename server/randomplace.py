@@ -114,6 +114,6 @@ def pick(md, rng=None):
         except Exception as e:          # a cell that will not load (offline): another town
             log.debug("random place near %s: %s: %s", name, type(e).__name__, e)
             continue
-        if spot is not None:
+        if spot is not None and region.contains(spot[0], spot[1]):   # (a town near the edge: its road may be outside)
             return spot[0], spot[1], f"Near {name}"
     return None

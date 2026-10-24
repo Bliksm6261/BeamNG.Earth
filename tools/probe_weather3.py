@@ -44,7 +44,7 @@ return jsonEncode({ cov = o.coverage, cirrus = o.cirrusCoverage, cirrusDensity =
     print("home", home, "saved", saved, flush=True)
     lua("if not beamngEarth_perfmon then extensions.load('beamngEarth_perfmon') end return 1")
     try:
-        lua(f"commands.setGameCamera(); return beamngEarth_core.teleport({SITE[0]}, {SITE[1]})")
+        lua(f"commands.setGameCamera(); return beamngEarth_core.teleport({SITE[0]}, {SITE[1]}, nil, {{ anywhere = true }})")
         print("loaded", wait_loaded(), flush=True)
         time.sleep(5)
 
@@ -126,7 +126,7 @@ table.sort(out); return table.concat(out, ' | ')""")
         lua(f"local o = scenetree.findObject('bngEarthClouds'); if o then o.coverage = {saved['cov']}; o.height = {saved['height']}; "
             f"o:setField('baseColor', 0, '{saved['baseColor']}'); o:postApply() end return 1")
         print(lua(RESTORE), flush=True)
-        print(lua(f"commands.setGameCamera(); return beamngEarth_core.teleport({home['lat']}, {home['lon']})"), flush=True)
+        print(lua(f"commands.setGameCamera(); return beamngEarth_core.teleport({home['lat']}, {home['lon']}, nil, {{ anywhere = true }})"), flush=True)
         wait_loaded(120)
     json.dump(res, open(os.path.join(a.out, "results.json"), "w"), indent=1)
 

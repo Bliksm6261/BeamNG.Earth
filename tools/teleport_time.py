@@ -42,7 +42,7 @@ def main():
     lat, lon = (float(x) for x in a.latlon.split(","))
     before = poll()
     t0 = time.time()
-    mcp.call("run_lua", {"code": f"return tostring(beamngEarth_core.teleport({lat}, {lon}, nil, {{record = false}}))"})
+    mcp.call("run_lua", {"code": f"return tostring(beamngEarth_core.teleport({lat}, {lon}, nil, {{record = false, anywhere = true}}))"})
     marks, last = {}, None
     while time.time() - t0 < a.timeout:
         time.sleep(POLL_S)

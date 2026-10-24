@@ -53,9 +53,14 @@ class RoadSpotTest(unittest.TestCase):
         saved = randomplace._towns
         try:
             randomplace._towns = [(LAT, LON, "Testtown")]
+            # Testtown (Baltimore) is outside the edition's region: its road is never a start ...
+            self.assertIsNone(randomplace.pick(OneCell(f), np.random.default_rng(3)))
+            # ... and is one with the whole planet open
+            region.set_data({"name": "", "countries": [], "polygons": []})
             got = randomplace.pick(OneCell(f), np.random.default_rng(3))
         finally:
             randomplace._towns = saved
+            region.set_data()
         self.assertIsNotNone(got)
         self.assertEqual(got[2], "Near Testtown")
         self.assertAlmostEqual((got[0] - LAT) * M_LAT, 0.0, delta=0.5, msg="on the street")
