@@ -928,7 +928,8 @@ def run(args):
                 if exe:
                     row("Game", f"starting through BeamMP ({exe})")
                     try:
-                        mp = beammp_launch.start(exe, ["-gfx", args.gfx] if args.gfx else [])
+                        mp = beammp_launch.start(exe, (["-gfx", args.gfx] if args.gfx else [])
+                                                      + os.environ.get("BNGE_GAME_ARGS", "").split())
                         multiplayer = beammp_launch.game_started(mp, game_pids)
                         if not multiplayer:    # it ended first (a failed update, ...)
                             row("Game", f"BeamMP ended (code {mp.returncode}) before the game started; "
