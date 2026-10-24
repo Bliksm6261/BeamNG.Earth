@@ -4,7 +4,8 @@ random part of the world"; the default places list, some of which started the pl
     road_spot(md, lat, lon, radius_m)   -> (lat, lon, class) on the nearest public road (on the ground: no bridge or
                                            tunnel) within radius_m, or None
     pick(md, rng)                       -> (lat, lon, name): a road near a random town (Natural Earth's 1:10m
-                                           populated places, the world map's place names: maplayers.js), or None
+                                           populated places, the world map's place names: maplayers.js), or None;
+                                           only towns inside the edition's region (region.py)
 
 Both read the roads layer of the map cells around the point (md.cell, kind "demand": downloaded when not at hand), so
 they run in a worker thread.
@@ -18,6 +19,7 @@ import sys
 import numpy as np
 
 import mapcells
+import region
 import roads as roadsmod
 
 log = logging.getLogger("earthd.randomplace")
@@ -36,7 +38,8 @@ _towns = None
 
 
 def towns():
-    """[(lat, lon, name)] of the populated places, read once (an empty list when the file is missing)."""
+    """[(lat, lon, name)] of the populated places inside the edition's region (region.py), read once (an empty list
+    when the file is missing)."""
     global _towns
     if _towns is None:
         try:
@@ -44,6 +47,7 @@ def towns():
                 text = fh.read()
             data = json.loads(text[text.index("export default ") + len("export default "):].rstrip().rstrip(";"))
             _towns = [(float(p[2]), float(p[1]), " ".join(str(p[0]).split())) for p in data.get("places", [])]
+            _towns = [t for t in _towns if region.contains(t[0], t[1])]
         except (OSError, ValueError, KeyError, IndexError) as e:
             log.warning("random place: no towns (%s: %s)", type(e).__name__, e)
             _towns = []

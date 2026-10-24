@@ -66,6 +66,7 @@ local gps = require('beamngEarth/gps')               -- the game's GPS route to 
 local collisionfoci = require('beamngEarth/collisionfoci') -- other vehicles' collision islands
 local terrainpatch = require('beamngEarth/terrainpatch')   -- ground under the islands off the terrain block
 local farcars = require('beamngEarth/farcars')             -- far player cars saved, taken out and put back
+local region = require('beamngEarth/region')               -- the edition's countries: no teleports outside
 local fociBroken = false
 -- The pose's foci: the last collision foci (collisionfoci.lua), rounded, at most 16 (earthd FOCI_MAX); nil when none.
 local function poseFoci()
@@ -102,8 +103,8 @@ local FLOOR_HIT_M = 0.8        -- m the static collision found under floorZ + 2 
 local PRE_LIFT = 5             -- m above groundZ + 1 to hold the vehicle until it is placed
 local LOADING_AFTER_TELEPORT_S = 3 -- governor loading mode (8 ms budget) this long after a teleport
 local SLOW_SPEED, SLOW_S = 1, 3    -- ... and while the player is below 1 m/s for over 3 s
-local DEFAULT_LAT, DEFAULT_LON = 36.596718, -118.169991 -- Whitney Portal Road under Mt Whitney (the summit, 36.5785,
-                                                         -- -118.2923, was a start on a 20 % slope 3 km from any road)
+local DEFAULT_LAT, DEFAULT_LON = -29.5868, 29.2886     -- Sani Top, the head of Sani Pass (Lesotho side), inside the
+                                                         -- edition's region (region.lua); upstream: Whitney Portal Road
 -- The server cannot move the block when it is not connected, has not said hello, or does not answer
 -- terrain requests: one unanswered for STUCK_S, or a terrain_error within ERROR_HOLD_S. Only then
 -- does the edge guard run.
@@ -1911,6 +1912,15 @@ teleportTo = function(lat, lon, name, kind)
   lat, lon = tonumber(lat), tonumber(lon)
   if not lat or not lon or lat < -90 or lat > 90 or lon < -180 or lon > 180 then
     setStatus('Teleport: invalid lat/lon')
+    return false
+  end
+  if kind ~= 'tool' and not region.contains(lat, lon) then
+    log('I', 'beamngEarth', string.format('teleport to %.5f, %.5f refused: outside %s', lat, lon, region.name()))
+    -- the level start must land somewhere (a remembered place from before the region, a random place outside it)
+    if kind == 'start' and region.contains(DEFAULT_LAT, DEFAULT_LON) then
+      return teleportTo(DEFAULT_LAT, DEFAULT_LON, nil, kind)
+    end
+    setStatus('Teleport: this edition covers ' .. table.concat(region.data.countries or {}, ', ') .. ' only')
     return false
   end
   ui.setLatLon(lat, lon)

@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import mapcells  # noqa: E402
 import placepreview  # noqa: E402
 import randomplace  # noqa: E402
+import region  # noqa: E402
 from test_roads import features, LAT, LON, M_LAT, M_LON  # noqa: E402
 
 
@@ -44,7 +45,8 @@ class RoadSpotTest(unittest.TestCase):
 
     def test_towns_and_a_pick(self):
         ts = randomplace.towns()
-        self.assertGreater(len(ts), 5000)
+        self.assertGreater(len(ts), 100 if region.enabled() else 5000)
+        self.assertTrue(all(region.contains(t[0], t[1]) for t in ts), "only towns inside the edition's region")
         self.assertTrue(all(-90 <= t[0] <= 90 and -180 <= t[1] <= 180 for t in ts[:200]))
         # every town's roads: one street through (LAT, LON); the random town is put there
         f = features([[(-3000, 0), (3000, 0)]], ["residential"])

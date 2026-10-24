@@ -4,6 +4,15 @@ A 1:1 scale, streamed Earth for [BeamNG.drive](https://www.beamng.com/): drive a
 planet on real elevation data and satellite imagery, with distance-based level of detail and the
 real curvature of the Earth.
 
+**Off the Beaten Track edition.** This fork is limited to the countries covered by
+[Off the Beaten Track](https://offthebeatentrack.world): South Africa, Namibia, Botswana, Zimbabwe, Zambia, Mozambique,
+Lesotho, Eswatini, Malawi and Tanzania. A teleport outside them (from the map, search or saved places) is refused,
+the random start only picks towns inside them
+(`region.lua`, `server/region.py`), and the game starts at Sani Pass. Rebuild the region with
+`python3 tools/build_region.py ne_50m_admin_0_countries.geojson` (Natural Earth 1:50m countries); an empty
+`COUNTRIES` list there opens the whole planet again. Based on [TecnaGamer/BeamNG.Earth](https://github.com/TecnaGamer/BeamNG.Earth)
+(MIT).
+
 Status: beta (see VERSION). Tested on BeamNG.drive 0.40.3 on Linux (Vulkan) and the Steam Deck. See
 [docs/ROADMAP.md](docs/ROADMAP.md) for what is coming.
 
