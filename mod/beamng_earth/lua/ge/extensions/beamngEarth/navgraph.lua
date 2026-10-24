@@ -479,6 +479,7 @@ end
 local function startTraffic()
   started = true
   M.restoreChoice()       -- freeroam's own spawn time has passed
+  if require('beamngEarth/mptraffic').active() then return end    -- (BeamMP: the server's share, mptraffic.lua)
   local c = M.choice
   local gt = c.traffic and trafficSystem() or nil
   if gt and gt.getState() ~= 'on' then

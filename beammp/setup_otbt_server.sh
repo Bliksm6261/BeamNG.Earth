@@ -8,11 +8,13 @@
 #   2. gets BeamMP's latest Linux server build from its GitHub releases into /opt/beammp
 #   3. builds the edition's server files from the fork (tools/package.py --beammp) and unzips them over the server:
 #      Resources/Client/beamng_earth.zip (sent to every player) and Resources/Server/BeamNGEarth (the plugin)
-#   4. writes ServerConfig.toml (first run only): the edition's map, port 30814, name, AUTHKEY
+#   4. writes ServerConfig.toml (first run only): the edition's map, port 30814, name, AUTHKEY; MaxCars raised to
+#      MAXCARS on every run (each player's 2 own cars and the traffic the plugin may give them: main.lua's OWN_CARS +
+#      TRAFFIC_CARS + PARKED_CARS; the plugin refuses the rest)
 #   5. opens port 30814 TCP and UDP (ufw, when it is on) and runs the server as a systemd service, "beammp"
 #
 # Settings (environment): AUTHKEY (needed the first time), BRANCH (the fork's branch, default main), PORT (30814),
-# PRIVATE (true: not in BeamMP's public server list; default true), MAXPLAYERS (default 10).
+# PRIVATE (true: not in BeamMP's public server list; default true), MAXPLAYERS (default 10), MAXCARS (default 16).
 # Logs: journalctl -u beammp -f   Restart: systemctl restart beammp
 set -euo pipefail
 
@@ -21,6 +23,7 @@ BRANCH=${BRANCH:-main}
 PORT=${PORT:-30814}
 PRIVATE=${PRIVATE:-true}
 MAXPLAYERS=${MAXPLAYERS:-10}
+MAXCARS=${MAXCARS:-16}
 DIR=/opt/beammp
 SRC=/opt/beammp-src
 USER_NAME=beammp
@@ -86,7 +89,7 @@ Description = "Overland Southern Africa. Join with the Off the Beaten Track app:
 Tags = "Freeroam,Offroad"
 Map = "/levels/beamng_earth/info.json"
 Port = $PORT
-MaxCars = 2
+MaxCars = $MAXCARS
 MaxPlayers = $MAXPLAYERS
 Private = $PRIVATE
 Debug = false
@@ -97,6 +100,12 @@ EOF
   chmod 600 "$DIR/ServerConfig.toml"
 else
   echo "== ServerConfig.toml kept (delete it to write a new one)"
+  # (a config from before the traffic: room for the cars the plugin gives each player)
+  OLD=$(sed -n 's/^MaxCars *= *\([0-9]*\).*/\1/p' "$DIR/ServerConfig.toml" | head -1)
+  if [ -n "$OLD" ] && [ "$OLD" -lt "$MAXCARS" ]; then
+    sed -i "s/^MaxCars *= *[0-9]*/MaxCars = $MAXCARS/" "$DIR/ServerConfig.toml"
+    echo "   MaxCars $OLD -> $MAXCARS"
+  fi
 fi
 chown -R "$USER_NAME:$USER_NAME" "$DIR"
 

@@ -246,7 +246,8 @@ function M.update(aid, player, blk, gov)
     started = true
     -- the player's level-start choice (navgraph.choice; the radial menu works at any time)
     local c = require('beamngEarth/navgraph').choice
-    if c.parked and not gp.getState() then
+    -- (BeamMP: the server's share instead, mptraffic.lua)
+    if c.parked and not gp.getState() and not require('beamngEarth/mptraffic').active() then
       local amount = (c.parkedAmount and c.parkedAmount > 0) and c.parkedAmount or -1
       local okS, err = pcall(gp.setupVehicles, amount, { pos = vec3(player.x, player.y, player.z) })
       if not okS then log('W', 'beamngEarth', 'parking: setupVehicles: ' .. tostring(err)) end
