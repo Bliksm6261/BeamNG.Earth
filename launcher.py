@@ -831,6 +831,8 @@ def main():
     ap.add_argument("--gfx", default="", choices=["dx11", "dx12", "vk", ""],
                     help="the Windows build's renderer, skipping its launch options dialog (default: the dialog)")
     ap.add_argument("--no-terminal", action="store_true", help="Linux: no terminal window (log to a file)")
+    ap.add_argument("--single-player", action="store_true",
+                    help="Windows: start the game itself, not through BeamMP (no multiplayer)")
     ap.add_argument("extra", nargs=argparse.REMAINDER, help="after --: more options for the server")
     args = ap.parse_args()
     if IS_WIN:
@@ -917,9 +919,28 @@ def run(args):
         else:
             if wine:
                 say("(under Wine / Proton: on Linux the AppImage runs the server natively, faster)")
-            proc = start_game(not args.no_gcpatch, build, args.gfx, user_dir)
+            proc, multiplayer = None, False
+            if IS_WIN and not wine and not args.single_player:
+                # the edition's multiplayer: BeamMP's launcher starts the game with its mod, and the mod joins the
+                # edition's server by itself (beammp_launch.py, autojoin.lua)
+                import beammp_launch
+                exe = beammp_launch.ensure(data_dir(), say)
+                if exe:
+                    row("Game", f"starting through BeamMP ({exe})")
+                    try:
+                        mp = beammp_launch.start(exe, (["-gfx", args.gfx] if args.gfx else [])
+                                                      + os.environ.get("BNGE_GAME_ARGS", "").split())
+                        multiplayer = beammp_launch.game_started(mp, game_pids)
+                        if not multiplayer:    # it ended first (a failed update, ...)
+                            row("Game", f"BeamMP ended (code {mp.returncode}) before the game started; "
+                                        "starting without multiplayer")
+                    except OSError as e:       # a broken BeamMP install: the game without multiplayer
+                        row("Game", f"BeamMP did not start ({e}); starting without multiplayer")
+            if not multiplayer:
+                proc = start_game(not args.no_gcpatch, build, args.gfx, user_dir)
         say()
-        say("In the game: Freeroam > BeamNG.Earth.  Closing the game stops the server.")
+        say("In the game: Freeroam > BeamNG.Earth (with multiplayer: the server is joined by itself).  "
+            "Closing the game stops the server.")
         say()
         wait_for_game(proc)
         row("Game", "closed")

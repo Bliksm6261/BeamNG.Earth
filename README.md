@@ -14,6 +14,11 @@ points. Rebuild the region with
 `COUNTRIES` list there opens the whole planet again. Based on [TecnaGamer/BeamNG.Earth](https://github.com/TecnaGamer/BeamNG.Earth)
 (MIT).
 
+**One app for everything (Windows).** The app gets BeamMP's launcher by itself on first start (from BeamMP's GitHub
+releases, checked against its SHA-256: `beammp_launch.py`), starts the game through it, and the game joins the
+edition's multiplayer server by itself (`autojoin.lua`; the server is set in `edition.lua`: beamng.offthebeatentrack.world, port 30814).
+A player signed out of BeamMP plays as a guest. `--single-player` starts the game without BeamMP.
+
 Status: beta (see VERSION). Tested on BeamNG.drive 0.40.3 on Linux (Vulkan) and the Steam Deck. See
 [docs/ROADMAP.md](docs/ROADMAP.md) for what is coming.
 

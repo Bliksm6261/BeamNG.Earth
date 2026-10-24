@@ -271,6 +271,12 @@ const settingsSchema = [
     ],
   },
   {
+    name: "Multiplayer",
+    items: [
+      { id: "autoJoin", type: "bool", default: true, name: "Join the edition's server", desc: "When the game starts through the app, join the edition's BeamMP server by itself (signed in to BeamMP, or as a guest). Off: BeamMP's own server list. Takes effect at the next game start." },
+    ],
+  },
+  {
     name: "Download cache",
     items: [
       { id: "cacheUsage", type: "info", name: "Download cache", desc: "Elevation and imagery the server downloaded and keeps on disk (~/.cache/beamng-earth), so revisited places load without downloading again: the space in use, the size limit and the number of files." },

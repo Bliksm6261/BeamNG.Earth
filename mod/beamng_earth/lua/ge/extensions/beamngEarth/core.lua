@@ -67,6 +67,8 @@ local collisionfoci = require('beamngEarth/collisionfoci') -- other vehicles' co
 local terrainpatch = require('beamngEarth/terrainpatch')   -- ground under the islands off the terrain block
 local farcars = require('beamngEarth/farcars')             -- far player cars saved, taken out and put back
 local region = require('beamngEarth/region')               -- the edition's countries: no teleports outside
+local autojoin = require('beamngEarth/autojoin')           -- join the edition's BeamMP server by itself
+local autojoinBroken = false
 local fociBroken = false
 -- The pose's foci: the last collision foci (collisionfoci.lua), rounded, at most 16 (earthd FOCI_MAX); nil when none.
 local function poseFoci()
@@ -1589,6 +1591,10 @@ end
 local function onUpdate(dtReal, dtSim)
   dtReal = dtReal or 0
   local frameMs0 = frameTimer and frameTimer:stopAndReset() or dtReal * 1000
+  if not autojoinBroken and autojoin.state() ~= 'done' then  -- in the menus too: BeamMP is ready before any level
+    local ok, err = pcall(autojoin.update, dtReal, settings)
+    if not ok then autojoinBroken = true; log('E', 'beamngEarth', 'autojoin: ' .. tostring(err)) end
+  end
   if not st.inOurLevel and not st.active then
     -- Other levels and the menus: nothing but the connection to the world server, kept open (on Linux the
     -- launcher's sign that the game still runs, launcher.game_connected; its messages only store what the
@@ -2174,5 +2180,8 @@ M.onClientEndMission = onClientEndMission
 M.onClientPostStartMission = onClientPostStartMission
 M.onExtensionLoaded = onExtensionLoaded
 M.onExtensionUnloaded = onExtensionUnloaded
+-- across a Lua reload (BeamMP reloads after leaving a server): only autojoin's one-shot state
+M.onSerialize = function() return { autojoin = autojoin.serialize() } end
+M.onDeserialized = function(d) autojoin.deserialize(type(d) == 'table' and d.autojoin) end
 
 return M
