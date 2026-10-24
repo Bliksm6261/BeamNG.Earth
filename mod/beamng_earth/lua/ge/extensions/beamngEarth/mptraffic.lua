@@ -100,7 +100,8 @@ end
 -- The two kinds: the stock system's state and calls.
 local kinds = {
   traffic = {
-    system = function() return rawget(_G, 'gameplay_traffic') end,
+    -- (loaded here when absent: in a session navgraph.lua starts nothing, so nothing else may have loaded them)
+    system = function() return require('beamngEarth/navgraph').trafficSystem() end,
     ids = function(gt)
       local out = {}
       local ok, data = pcall(gt.getTrafficData)
@@ -115,7 +116,7 @@ local kinds = {
     remove = function(gt, id) if gt.removeTraffic then gt.removeTraffic(id) end end,
   },
   parked = {
-    system = function() return rawget(_G, 'gameplay_parking') end,
+    system = function() return require('beamngEarth/parking').parkingSystem() end,
     ids = function(gp)
       local ok, list = pcall(gp.getParkedCarsList)
       local out = {}

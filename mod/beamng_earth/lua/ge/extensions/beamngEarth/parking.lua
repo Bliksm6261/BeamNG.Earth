@@ -75,6 +75,7 @@ local function parkingSystem()
   end
   return gameplay_parking
 end
+M.parkingSystem = parkingSystem   -- (mptraffic.lua)
 
 local function newSites()
   return require('/lua/ge/extensions/gameplay/sites/sites')('BeamNG.Earth')

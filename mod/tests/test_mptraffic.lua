@@ -55,8 +55,11 @@ gameplay_traffic = {
   end,
   removeTraffic = function(id) traffic[id] = nil end,
 }
-package.loaded['beamngEarth/navgraph'] = { status = function() return { started = true } end }
-package.loaded['beamngEarth/parking'] = { status = function() return { started = false } end }
+local loads = 0
+package.loaded['beamngEarth/navgraph'] = { status = function() return { started = true } end,
+  trafficSystem = function() loads = loads + 1; return gameplay_traffic end }
+package.loaded['beamngEarth/parking'] = { status = function() return { started = false } end,
+  parkingSystem = function() return nil end }
 
 T.check(not mt.active(), 'not in a session: the player\'s own choice runs the traffic')
 mt.onPostJoin()
@@ -66,6 +69,7 @@ T.check(#setup == 0, 'no share yet: nothing started')
 mt.onTraffic({ traffic = 4, parked = 3, police = true })
 mt.update(0.1)
 T.check(#setup == 1 and setup[1].n == 4 and setup[1].police == true, 'the share: 4 cars started, police as the server says')
+T.check(loads > 0, 'the traffic extensions asked for through navgraph (it loads them when absent)')
 mt.onTraffic({ traffic = 2, parked = 3 })
 mt.update(0.1)
 local n = 0

@@ -376,6 +376,7 @@ local function trafficSystem()
   end
   return gameplay_traffic
 end
+M.trafficSystem = trafficSystem   -- (mptraffic.lua: the extensions loaded in a session too)
 
 local function playerId() return be and be.getPlayerVehicleID and be:getPlayerVehicleID(0) or -1 end
 
