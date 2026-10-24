@@ -50,7 +50,10 @@ TSIP=$(tailscale ip -4 2>/dev/null | head -1)
 echo "   tailscale: $TSIP ($HOSTNAME_TS)"
 
 echo "== SSH: keys only, no root, no passwords"
-cat > /etc/ssh/sshd_config.d/99-hardening.conf <<EOF
+# 00-: sshd takes the first value it reads and reads the drop-ins in name order, so this must come before others (an
+# image's 50-cloud-init.conf often sets PasswordAuthentication yes)
+rm -f /etc/ssh/sshd_config.d/99-hardening.conf
+cat > /etc/ssh/sshd_config.d/00-hardening.conf <<EOF
 PasswordAuthentication no
 PermitRootLogin no
 KbdInteractiveAuthentication no
@@ -58,6 +61,11 @@ PubkeyAuthentication yes
 PermitEmptyPasswords no
 EOF
 sshd -t
+# the effective settings (sshd -T), not just the file: stop if anything still allows passwords or root
+EFF=$(sshd -T 2>/dev/null)
+for want in "passwordauthentication no" "permitrootlogin no" "kbdinteractiveauthentication no" "pubkeyauthentication yes"; do
+  echo "$EFF" | grep -qx "$want" || { echo "sshd still differs: wanted '$want'; check /etc/ssh/sshd_config(.d)"; exit 1; }
+done
 systemctl reload ssh 2>/dev/null || systemctl reload sshd
 
 echo "== firewall: deny by default; SSH on tailscale0 only; game port $GAME_PORT public"
