@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="220" viewBox="0 0 1040 220">
+  <!-- South African style plate for the pack (520 x 110 mm, the SA standard size, at 2 px/mm). Generic white
+       reflective plate, black text, an OTBT orange strip instead of a provincial emblem so it is clearly fictional.
+       The game draws the text; this is the background and the reference for the modder's plate design. -->
+  <rect x="4" y="4" width="1032" height="212" rx="18" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="8"/>
+  <rect x="20" y="20" width="70" height="180" rx="8" fill="#FF9500"/>
+  <text x="55" y="125" text-anchor="middle" font-family="Arial, sans-serif" font-size="40" font-weight="700" fill="#1A1A1A">ZA</text>
+  <text x="560" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-size="120" font-weight="700" fill="#1A1A1A">OTBT 001 GP</text>
+</svg>
