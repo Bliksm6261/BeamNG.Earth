@@ -137,6 +137,7 @@ def pyinstaller(work, ico, onefile, ver=None, boot=None):
            "--specpath", work, "--paths", server, "--paths", ROOT, "--icon", ico,
            "--collect-submodules", "fsspec",
            "--hidden-import", "certifi", "--collect-data", "certifi",   # CA bundle fallback (launcher.ensure_ca_certs)
+           "--hidden-import", "beammp_launch",                           # (launcher.run: imported when needed)
            "--add-data", f"{os.path.join(ROOT, 'mod', 'beamng_earth')}{SEP}mod/beamng_earth",
            "--add-data", f"{os.path.join(ROOT, 'VERSION')}{SEP}.",
            "--add-data", f"{os.path.join(server, 'bridges_us.npz')}{SEP}.",     # (bridgetypes.DB_PATH: beside the modules)
