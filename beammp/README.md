@@ -3,6 +3,11 @@
 This zip turns a BeamMP server into a BeamNG.Earth server: the real world, streamed around every player. Players join
 with the normal BeamMP launcher.
 
+## Off the Beaten Track's server
+
+On an Ubuntu VPS, `setup_otbt_server.sh` (beside this file in the repository) does all of the steps below:
+`sudo AUTHKEY=<your key> bash setup_otbt_server.sh` (before the edition is merged: add `BRANCH=otbt-branding`).
+
 ## Quick server setup
 
 1. **Get the BeamMP server** (the latest release from https://github.com/BeamMP/BeamMP-Server/releases; Windows:
@@ -34,7 +39,7 @@ data and little CPU: the world is built on each player's computer.
 
 ## Players
 
-- **Every player needs the BeamNG.Earth app** (https://github.com/TecnaGamer/BeamNG.Earth/releases) running, the same
+- **Every player needs the BeamNG.Earth app** (https://github.com/Bliksm6261/BeamNG.Earth/releases) running, the same
   version as the server's. Start the BeamNG.Earth app and the BeamMP launcher in either order (the app starts the game,
   or just its world server if the game is already running), then join. Without the app, a window asks to install it:
   the world can't load without it.
