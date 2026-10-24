@@ -6,7 +6,8 @@
 --     heading (others(): the world map's arrows); the cars of a
 --     player whose anchor is not known (no BeamNG.Earth, or not heard yet) are deactivated here: they would stand in
 --     the wrong place;
---   - bngeGoTo { lat, lon }: on joining, a teleport to where the others are.
+--   - bngeGoTo { lat, lon }: on joining, a teleport to where the others are;
+--   - bngeTraffic { traffic, parked, police }: the AI cars our game runs for the players near us (mptraffic.lua).
 -- Damage: BeamMP sends parts that break off (break groups) but not dents; its own full-damage message (nodesVE.getNodes:
 -- every node and beam, applied on the other players' copies by its nodesGE) is never sent. This sends it for our own
 -- cars when another player comes within DAMAGE_NEAR_M (they see the car as it is) and DAMAGE_SETTLE_S after our car's
@@ -407,6 +408,11 @@ function M.shareRequest(cfg)
   return { type = 'share', port = port }
 end
 
+local function onTraffic(data)
+  local ok, d = pcall(jsonDecode, data)
+  if ok then require('beamngEarth/mptraffic').onTraffic(d) end
+end
+
 local function onPeers(data)
   local ok, d = pcall(jsonDecode, data)
   if not ok or type(d) ~= 'table' or type(d.members) ~= 'table' then return end
@@ -478,6 +484,7 @@ end
 function M.onPostJoin()
   joined, wentTo, camPlaced = true, false, false
   anchors = {}
+  require('beamngEarth/mptraffic').onPostJoin()
 end
 
 -- Each frame (core.lua) in a BeamMP session in our level: anchor (core's st.anchor), player { x, y, z } in its frame
@@ -488,10 +495,13 @@ function M.update(dt, anchor, player)
     AddEventHandler('bngeGoTo', onGoTo, 'beamngEarth')
     AddEventHandler('bngePeers', onPeers, 'beamngEarth')
     AddEventHandler('bngeConfig', onConfig, 'beamngEarth')
+    AddEventHandler('bngeTraffic', onTraffic, 'beamngEarth')
     handlers = true
   end
   local mpanchor = require('beamngEarth/mpanchor')
   mpanchor.install()            -- (a no-op once installed, and until BeamMP's positionGE has loaded)
+  require('beamngEarth/mptraffic').update(dt)
+  require('beamngEarth/mpnet').update(dt, anchor, M.others())
   clock = clock + (dt or 0)
   statusIn = statusIn - (dt or 0)
   if statusIn <= 0 then
@@ -647,6 +657,8 @@ function M.reset()
   share, config, configWait, convergeIn, anchorSince, lastAnchorKey = nil, nil, 0, 0, 0, nil
   stats, statusIn = { anchors = 0, go = 0, poses = 0, converged = 0, peers = 0 }, M.STATUS_S
   require('beamngEarth/mpanchor').reset()
+  require('beamngEarth/mptraffic').reset()
+  require('beamngEarth/mpnet').reset()
 end
 
 -- The other players for the world map: { { name, lat, lon, h } } (h: heading in degrees from true north, nil when

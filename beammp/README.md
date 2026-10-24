@@ -18,7 +18,7 @@ key-only logins with Tailscale SSH off, UFW, fail2ban, automatic updates; the ga
    `ServerConfig.toml` and a `Resources` folder, then stops or waits. Close it.
 2. **Unzip this file into that folder.** Its `Resources` folder merges with the server's:
    - `Resources/Client/beamng_earth.zip`: the BeamNG.Earth level and mod (BeamMP sends it to every player who joins);
-   - `Resources/Server/BeamNGEarth/main.lua`: the server plugin (it tells the players where everyone is).
+   - `Resources/Server/BeamNGEarth/main.lua`: the server plugin (it tells the players where everyone is, and directs the traffic: each area's AI and parked cars, set at its top, are split between the players there and driven by their games; the server needs `MaxCars = 16`).
 3. **Edit `ServerConfig.toml`:**
 
    ```toml

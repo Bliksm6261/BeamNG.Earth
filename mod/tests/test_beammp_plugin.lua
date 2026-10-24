@@ -61,6 +61,42 @@ T.check(pe[3] and #pe[3].members == 1, 'peers: Italy alone')
 T.check(pe[4] == nil and pe[5] == nil, 'peers: no sharing port (or a bad one): left out')
 G.players, G.sentPeers = {}, {}
 
+-- traffic: the players within TRAFFIC_NEAR_M of each other split their area's cars, the odd ones to the lowest ids;
+-- a player far away runs a whole area's
+G.TRAFFIC_CARS, G.PARKED_CARS, G.TRAFFIC_NEAR_M = 8, 6, 1000
+local near = 800 / M_PER_DEG
+local sh = G.trafficShares({ [1] = { lat = -33.9, lon = 18.4 }, [2] = { lat = -33.9 + near, lon = 18.4 },
+  [3] = { lat = -33.9 + 2 * near, lon = 18.4 }, [10] = { lat = -26.2, lon = 28.0 } })
+T.check(sh[1].traffic == 3 and sh[2].traffic == 3 and sh[3].traffic == 2, 'shares: 8 moving cars over a chain of 3')
+T.check(sh[1].parked == 2 and sh[2].parked == 2 and sh[3].parked == 2, 'shares: 6 parked over 3')
+T.check(sh[10].traffic == 8 and sh[10].parked == 6 and sh[10].police == false, 'shares: alone in Johannesburg: all of it')
+local total = 0
+for _, s in pairs(sh) do total = total + s.traffic end
+T.check(total == 16, 'shares: each area\'s cars once (2 areas)')
+G.TRAFFIC_CARS = 0
+T.check(G.trafficShares({ [1] = { lat = 0, lon = 0 } })[1].traffic == 0, 'shares: no traffic set: none')
+G.TRAFFIC_CARS = 8
+
+-- the shares sent when they change; the car limit: own cars and the share, the previous (larger) one for a while
+G.shares, G.clock = {}, 100
+local ch = G.shareChanges({ [1] = { traffic = 8, parked = 6, police = false } })
+T.check(ch[1] and G.carLimit(1) == G.OWN_CARS + 14, 'limit: own cars and the share')
+T.check(next(G.shareChanges({ [1] = { traffic = 8, parked = 6, police = false } })) == nil, 'shares: unchanged: not sent')
+ch = G.shareChanges({ [1] = { traffic = 4, parked = 3, police = false }, [2] = { traffic = 4, parked = 3, police = false } })
+T.check(ch[1] and ch[2] and G.carLimit(1) == G.OWN_CARS + 14 and G.carLimit(2) == G.OWN_CARS + 7,
+  'limit: a smaller share: the previous one for LIMIT_GRACE_S')
+G.clock = 100 + G.LIMIT_GRACE_S
+T.check(G.carLimit(1) == G.OWN_CARS + 7, 'limit: then the new share')
+G.clock = 200
+ch = G.shareChanges({ [2] = { traffic = 8, parked = 6, police = false } })
+T.check(ch[1] and ch[1].traffic == 0 and ch[1].parked == 0, 'shares: a stale player (still connected): told to run none')
+T.check(next(G.shareChanges({ [2] = { traffic = 8, parked = 6, police = false } })) == nil, 'shares: ... once')
+G.clock = 200 + G.LIMIT_GRACE_S
+T.check(G.carLimit(1) == G.OWN_CARS, 'limit: no share (stale): own cars only, after the grace')
+G.onLeave(2)
+T.check(G.shares[2] == nil, 'left: the share forgotten')
+G.shares, G.clock = {}, 0
+
 -- bad input ignored; stale poses and players who left out
 T.check(G.onPose(4, { v = 1, aLat = 1, aLon = 1, lat = 1, lon = 1 }, 'd') == nil and G.players[4] == nil,
   'another protocol: ignored')

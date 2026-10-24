@@ -376,6 +376,7 @@ local function trafficSystem()
   end
   return gameplay_traffic
 end
+M.trafficSystem = trafficSystem   -- (mptraffic.lua: the extensions loaded in a session too)
 
 local function playerId() return be and be.getPlayerVehicleID and be:getPlayerVehicleID(0) or -1 end
 
@@ -479,6 +480,7 @@ end
 local function startTraffic()
   started = true
   M.restoreChoice()       -- freeroam's own spawn time has passed
+  if require('beamngEarth/mptraffic').active() then return end    -- (BeamMP: the server's share, mptraffic.lua)
   local c = M.choice
   local gt = c.traffic and trafficSystem() or nil
   if gt and gt.getState() ~= 'on' then
