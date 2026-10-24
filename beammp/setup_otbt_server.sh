@@ -36,18 +36,26 @@ id "$USER_NAME" >/dev/null 2>&1 || useradd --system --home "$DIR" --shell /usr/s
 mkdir -p "$DIR"
 
 echo "== BeamMP server (latest release)"
-# the newest Ubuntu x86_64 build among the release's files (named like BeamMP-Server.ubuntu.24.04.x86_64), else Debian's
-URL=$(curl -fsSL https://api.github.com/repos/BeamMP/BeamMP-Server/releases/latest | python3 -c '
-import json, re, sys
+# the build for this machine (BeamMP names them like BeamMP-Server.ubuntu.24.04.x86_64 / .arm64): its processor, and
+# the newest build of this distribution not newer than its version (else the newest one)
+ARCH=$(uname -m); case "$ARCH" in aarch64|arm64) ARCH=arm64 ;; x86_64|amd64) ARCH=x86_64 ;; esac
+. /etc/os-release
+URL=$(curl -fsSL https://api.github.com/repos/BeamMP/BeamMP-Server/releases/latest | \
+  OS_ID="$ID" OS_VER="$VERSION_ID" ARCH="$ARCH" python3 -c '
+import json, os, re, sys
+ver = lambda t: tuple(int(x) for x in t.split(".") if x.isdigit())
+mine, arch, os_id = ver(os.environ["OS_VER"]), os.environ["ARCH"], os.environ["OS_ID"].lower()
 best = None
 for a in json.load(sys.stdin)["assets"]:
-    m = re.fullmatch(r"BeamMP-Server[.-](ubuntu|debian)[.-]([\d.]+)[.-]x86_64", a["name"], re.I)
-    if m:
-        key = (m[1].lower() == "ubuntu", tuple(int(x) for x in m[2].split(".") if x))
-        if best is None or key > best[0]:
-            best = (key, a["browser_download_url"])
+    m = re.fullmatch(r"BeamMP-Server[.-](ubuntu|debian)[.-]([\d.]+)[.-](x86_64|arm64|aarch64)", a["name"], re.I)
+    if not m or m[3].lower().replace("aarch64", "arm64") != arch:
+        continue
+    v = ver(m[2])
+    key = (m[1].lower() == os_id, m[1].lower() == os_id and v <= mine, v)
+    if best is None or key > best[0]:
+        best = (key, a["browser_download_url"])
 print(best[1] if best else "")')
-[ -n "$URL" ] || { echo "no Linux x86_64 build found in BeamMP's latest release (github.com/BeamMP/BeamMP-Server/releases)"; exit 1; }
+[ -n "$URL" ] || { echo "no BeamMP server build for $ID $VERSION_ID $ARCH (github.com/BeamMP/BeamMP-Server/releases)"; exit 1; }
 echo "   $URL"
 curl -fsSL "$URL" -o "$DIR/BeamMP-Server.new"
 chmod +x "$DIR/BeamMP-Server.new"
