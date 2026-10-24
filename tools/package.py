@@ -8,7 +8,8 @@ __pycache__), the installer and launchers, and the player docs. The version is t
 
 --beammp also builds dist/BeamNG.Earth-BeamMP-Server-<VERSION>.zip: unzipped into a BeamMP server's folder it adds
 Resources/Client/beamng_earth.zip (the mod, sent to every player who joins), Resources/Server/BeamNGEarth (the
-plugin, beammp/Server) and the server's README (beammp/README.md).
+plugin, beammp/Server) and the server's README (beammp/README.md); and Resources/Client/otbt_overland.zip, the OTBT
+Overland vehicle pack (tools/build_vehicle_pack.py), once at least one of its configs is saved.
 """
 
 import argparse
@@ -74,6 +75,12 @@ def beammp_zip(out_dir, ver):
         for rel in tree_files("beammp/Server"):
             z.write(os.path.join(ROOT, "beammp/Server", rel), f"Resources/Server/{rel}")
         z.write(os.path.join(ROOT, "beammp/README.md"), "BeamNG.Earth-README.md")
+        from build_vehicle_pack import NAME, load_builds, pack_bytes
+        pack, missing = pack_bytes(allow_missing=True)
+        if len(missing) < len(load_builds()["builds"]):
+            z.writestr(f"Resources/Client/{NAME}", pack, zipfile.ZIP_STORED)
+        else:
+            print(f"{NAME}: no configs saved yet, not included", file=sys.stderr)
     print(f"{path}: {os.path.getsize(path) / 1e6:.1f} MB")
 
 

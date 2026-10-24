@@ -1,0 +1,40 @@
+{
+  "_doc": "The OTBT Overland builds: what each saved config (.pc) must contain. A modder saves each one in game (Vehicle Config, then Save) into mod/vehicles/<model>/<config>.pc, with a 500x281 thumbnail <config>.jpg; tools/build_vehicle_pack.py writes info_<config>.json from this file. Part names are left to the modder: they must be the real slot and part names of the game version we test on.",
+  "brand": {"name": "Off the Beaten Track", "short": "OTBT", "colour": "#FF9500", "url": "https://offthebeatentrack.world"},
+  "plates": {"country": "ZA", "default_design": "otbt_za", "text_pattern": "OTBT ### GP"},
+  "builds": [
+    {
+      "config": "otbt_bakkie_dc",
+      "model": "pickup",
+      "base": "Gavril D-Series crew cab, diesel, manual, 4WD",
+      "role": "The Hilux / Ranger stand-in: the everyday double-cab bakkie of the overlanding crowd",
+      "name": "OTBT Bakkie Double Cab",
+      "stock_parts": ["2in lift or the stock off-road suspension", "all-terrain tyres, 33in", "front and rear lockers", "low range", "steel front bumper with winch if the version has one"],
+      "new_parts": ["canopy with roof rack", "rooftop tent (closed)", "long-range tank (+80 L)", "snorkel", "dual jerry can holder", "recovery boards on the rack"],
+      "skin": "otbt_livery",
+      "priority": 1
+    },
+    {
+      "config": "otbt_cruiser",
+      "model": "roamer",
+      "base": "Gavril Roamer, diesel, 4WD",
+      "role": "The Land Cruiser / Prado stand-in: the long-distance wagon for the Kalahari and the Kaokoveld",
+      "name": "OTBT Cruiser",
+      "stock_parts": ["lift", "all-terrain tyres", "lockers", "low range"],
+      "new_parts": ["full-length roof rack", "rooftop tent (closed)", "long-range tank", "snorkel", "rear wheel carrier with a second spare", "awning (closed)"],
+      "skin": "otbt_livery",
+      "priority": 2
+    },
+    {
+      "config": "otbt_mini",
+      "model": "hopper",
+      "base": "Ibishu Hopper, 4WD",
+      "role": "The Jimny stand-in: light and narrow for Sani Pass and the Lesotho tracks",
+      "name": "OTBT Mini",
+      "stock_parts": ["lift", "all-terrain tyres", "low range"],
+      "new_parts": ["roof rack", "snorkel", "rear jerry can"],
+      "skin": "otbt_livery",
+      "priority": 3
+    }
+  ]
+}

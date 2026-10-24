@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2048" height="1024" viewBox="0 0 2048 1024">
+  <!-- Livery artwork for the OTBT Overland pack: the side graphic the modder lays onto each vehicle's skin UV map.
+       Body colour stays the player's choice (paint slot 1); this graphic goes on top. Brand orange #FF9500. -->
+  <rect width="2048" height="1024" fill="none"/>
+  <polygon points="0,700 2048,520 2048,640 0,820" fill="#FF9500"/>
+  <polygon points="0,840 2048,660 2048,690 0,870" fill="#1A1A1A"/>
+  <text x="1024" y="470" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="140" font-weight="900" fill="#FF9500">OFF THE BEATEN TRACK</text>
+  <text x="1024" y="560" text-anchor="middle" font-family="Arial, sans-serif" font-size="56" fill="#1A1A1A">offthebeatentrack.world</text>
+</svg>
