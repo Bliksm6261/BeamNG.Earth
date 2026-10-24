@@ -13,7 +13,9 @@
 --     them (positionVE: from the velocity, for up to 0.1 s);
 --   - MPInputsGE.sendInputs for our traffic: the changes merged and sent at most INPUTS_HZ (a change is never lost:
 --     the latest value of each input goes out with the next send).
--- The other players' places come from the plugin's anchors (mpsession.others), every POSE_S.
+-- The other players' places come from the plugin's anchors (mpsession.others), every POSE_S. Our update runs with
+-- mpsession's, which stops while the world server is not connected; the wraps then pass everything through as BeamMP
+-- would (no thinning without our clock: STALE_S).
 local M = {}
 
 M.NEAR_M = 300
@@ -25,9 +27,25 @@ M.POS_HZ_STILL = 1
 M.STILL_MS = 0.3
 M.INPUTS_HZ = 10
 M.NEAREST_S = 0.5           -- each traffic car's nearest other player found again this often
+M.STALE_S = 0.5             -- our update not run for this long (real time): the wraps thin nothing
 
 local installed = { pos = false, inputs = false }
 local clock = 0
+local updatedAt = nil       -- realTime() of our last update
+
+-- Seconds of real time (BeamMP's own high-precision timer when there is one; tests: M.realTime replaced).
+local timer = nil
+function M.realTime()
+  if not timer then
+    local mk = rawget(_G, 'HighPerfTimer') or rawget(_G, 'hptimer')
+    timer = mk and mk() or false
+  end
+  if timer then return timer:stop() / 1000 end
+  return os.clock()
+end
+
+-- Is our update running (the thinning is on)?
+local function live() return updatedAt ~= nil and M.realTime() - updatedAt < M.STALE_S end
 local lastPos = {}          -- own game vehicle id -> clock of its last position packet sent
 local lastInputs = {}       -- own game vehicle id -> clock of its last inputs packet sent
 local pendingInputs = {}    -- own game vehicle id -> { input -> value } not sent yet
@@ -103,7 +121,7 @@ function M.wrapPos(original)
     local ok, d = false, nil
     if decode then ok, d = pcall(decode, data) end
     if not ok then d = nil end
-    if isTraffic(gid) then
+    if isTraffic(gid) and live() then
       local hz = M.rateFor(nearest[gid], speedOf(d))
       if lastPos[gid] and clock - lastPos[gid] < 1 / hz - 1e-6 then return end
       lastPos[gid] = clock
@@ -130,6 +148,10 @@ function M.wrapInputs(original)
     local p = pendingInputs[gid] or {}
     for k, v in pairs(d) do p[k] = v end
     pendingInputs[gid] = p
+    if not live() then              -- (no flush coming: sent now, with anything held)
+      pendingInputs[gid] = {}
+      return original(M.inputsJson(p), gid)
+    end
   end
 end
 
@@ -184,6 +206,7 @@ end
 -- mpsession.others).
 function M.update(dt, anchor, others)
   M.install()
+  updatedAt = M.realTime()
   clock = clock + (dt or 0)
   nearestIn = nearestIn - (dt or 0)
   if nearestIn <= 0 and anchor and anchor.geodeticToEnu then
@@ -218,7 +241,7 @@ function M.status()
 end
 
 function M.reset()
-  clock, lastPos, lastInputs, pendingInputs, nearest, nearestIn = 0, {}, {}, {}, {}, 0
+  clock, lastPos, lastInputs, pendingInputs, nearest, nearestIn, updatedAt = 0, {}, {}, {}, {}, 0, nil
   stats = { posIn = 0, posOut = 0, bytesIn = 0, bytesOut = 0, inputsIn = 0, inputsOut = 0 }
 end
 

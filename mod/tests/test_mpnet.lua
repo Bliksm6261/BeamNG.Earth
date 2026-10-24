@@ -5,6 +5,8 @@ local dir = (arg[0]:match('^(.*)[/\\]') or '.')
 local T = dofile(dir .. '/testlib.lua')
 local S = dofile(dir .. '/stubs.lua')
 local net = require('beamngEarth/mpnet')
+local real = 0
+net.realTime = function() return real end
 
 -- pure: the rate
 T.check(net.rateFor(100, 15) == net.POS_HZ_NEAR, 'rate: a player near: the full rate')
@@ -45,7 +47,7 @@ T.check(net.compact({ pos = { 1, 2 } }) == nil and net.compact({ tim = 0 / 0 }) 
 -- the wraps
 local packets = {}
 function jsonDecode(s) return s == before and d or (s:sub(1, 1) == '{' and s:find('"t"') and { t = 0.5, s = -0.1 }
-  or s:find('"b"') and { b = 1 } or s:find('"s"') and { s = 0.2 } or nil) end
+  or s:find('"b"') and { b = 1 } or s:find('0.3') and { s = 0.3 } or s:find('"s"') and { s = 0.2 } or nil) end
 local ours = { [7] = true }
 package.loaded['beamngEarth/mptraffic'] = { isOurs = function(id) return ours[id] == true end,
   ours = function() return { 7 } end }
@@ -56,6 +58,11 @@ pos(before, 3)
 T.check(#packets == 2, 'positions: our own car: not thinned')
 pos('not json', 3)
 T.check(packets[3].data == 'not json', 'positions: a packet that does not decode: as it was')
+packets = {}
+pos(before, 7)
+pos(before, 7)
+T.check(#packets == 2, 'positions: our update not running yet: nothing thinned')
+net.update(0)
 packets = {}
 pos(before, 7)
 pos(before, 7)
@@ -91,6 +98,16 @@ net.update(0.01)
 T.check(#inputs == 1, 'inputs: not again within 1/INPUTS_HZ')
 net.update(1 / net.INPUTS_HZ)
 T.check(#inputs == 2 and inputs[2].data == '{"s":0.2}', 'inputs: then the change')
+
+-- our update stops (the world server is not connected): everything through, as BeamMP would
+send('{"b":1}', 7)              -- (held: our update is still live)
+real = real + net.STALE_S + 1
+inputs, packets = {}, {}
+send('{"s":0.3}', 7)
+T.check(inputs[1] and inputs[1].data == '{"b":1,"s":0.3}', 'our update stopped: the held change goes with the next')
+pos(before, 7)
+pos(before, 7)
+T.check(#inputs == 1 and #packets == 2, 'our update stopped: inputs and positions straight through')
 
 local st = net.status()
 T.check(st.bytesOut < st.bytesIn, 'status: fewer bytes out than in')
