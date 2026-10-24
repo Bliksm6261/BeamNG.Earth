@@ -181,8 +181,14 @@ function G.shareChanges(now)
       out[pid] = s
     end
   end
-  for pid in pairs(G.shares) do
-    if not now[pid] then G.shares[pid] = nil end
+  -- a player still connected whose pose went stale (left out of the areas): told to run none, or their game would
+  -- keep its cars while the players near get that area's share too (onLeave forgets one who left)
+  for pid, old in pairs(G.shares) do
+    if not now[pid] and (old.traffic > 0 or old.parked > 0) then
+      local s = { traffic = 0, parked = 0, police = false, prev = old.traffic + old.parked, at = G.clock }
+      G.shares[pid] = s
+      out[pid] = s
+    end
   end
   return out
 end
@@ -299,7 +305,7 @@ if MP and MP.RegisterEvent then
     end
     for pid, s in pairs(G.shareChanges(G.trafficShares(G.live()))) do
       MP.TriggerClientEvent(pid, 'bngeTraffic', encode({ traffic = s.traffic, parked = s.parked, police = s.police }))
-      print(string.format('[BeamNG.Earth] %s runs %d traffic and %d parked car(s)', tostring(G.players[pid].name),
+      print(string.format('[BeamNG.Earth] %s runs %d traffic and %d parked car(s)', tostring((G.players[pid] or {}).name),
         s.traffic, s.parked))
     end
   end

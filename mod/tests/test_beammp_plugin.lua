@@ -87,8 +87,12 @@ T.check(ch[1] and ch[2] and G.carLimit(1) == G.OWN_CARS + 14 and G.carLimit(2) =
   'limit: a smaller share: the previous one for LIMIT_GRACE_S')
 G.clock = 100 + G.LIMIT_GRACE_S
 T.check(G.carLimit(1) == G.OWN_CARS + 7, 'limit: then the new share')
-G.shareChanges({ [2] = { traffic = 8, parked = 6, police = false } })
-T.check(G.shares[1] == nil and G.carLimit(1) == G.OWN_CARS, 'limit: no share (gone): own cars only')
+G.clock = 200
+ch = G.shareChanges({ [2] = { traffic = 8, parked = 6, police = false } })
+T.check(ch[1] and ch[1].traffic == 0 and ch[1].parked == 0, 'shares: a stale player (still connected): told to run none')
+T.check(next(G.shareChanges({ [2] = { traffic = 8, parked = 6, police = false } })) == nil, 'shares: ... once')
+G.clock = 200 + G.LIMIT_GRACE_S
+T.check(G.carLimit(1) == G.OWN_CARS, 'limit: no share (stale): own cars only, after the grace')
 G.onLeave(2)
 T.check(G.shares[2] == nil, 'left: the share forgotten')
 G.shares, G.clock = {}, 0
