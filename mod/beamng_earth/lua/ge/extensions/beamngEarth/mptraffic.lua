@@ -22,6 +22,7 @@ local share = nil           -- { traffic, parked, police }: the plugin's latest 
 local shortFor = { traffic = 0, parked = 0 }
 local checkIn = 0
 local stats = { starts = 0, stops = 0, trims = 0, refills = 0 }
+local own = { traffic = {}, parked = {} }  -- kind -> { id = true }: our cars of it at the last check (mpnet.lua)
 
 function M.onPostJoin() inSession = true end
 
@@ -141,7 +142,8 @@ local function step(kind, target, dt)
   if not sys or k.busy(sys) then return end
   local cars = carsOf(k.ids(sys))
   local have = 0
-  for _ in pairs(cars) do have = have + 1 end
+  own[kind] = {}
+  for id in pairs(cars) do have = have + 1; own[kind][id] = true end
   shortFor[kind] = have < target and shortFor[kind] + dt or 0
   local what = M.plan(target, have, k.running(sys), shortFor[kind], k.ready())
   if not what then return end
@@ -180,6 +182,19 @@ function M.update(dt)
   end
 end
 
+-- Is the game vehicle id one of the traffic or parked cars our game runs for the server (at the last check)?
+function M.isOurs(id) return own.traffic[id] == true or own.parked[id] == true end
+
+-- Our traffic and parked cars' ids (at the last check).
+function M.ours()
+  local out = {}
+  for _, kind in ipairs({ 'traffic', 'parked' }) do
+    for id in pairs(own[kind]) do out[#out + 1] = id end
+  end
+  table.sort(out)
+  return out
+end
+
 function M.status()
   return { active = inSession, share = share, starts = stats.starts, stops = stats.stops, trims = stats.trims,
            refills = stats.refills }
@@ -188,6 +203,7 @@ end
 -- The session's end: the player's own choice again next time.
 function M.reset()
   inSession, share, checkIn = false, nil, 0
+  own = { traffic = {}, parked = {} }
   shortFor = { traffic = 0, parked = 0 }
   stats = { starts = 0, stops = 0, trims = 0, refills = 0 }
 end

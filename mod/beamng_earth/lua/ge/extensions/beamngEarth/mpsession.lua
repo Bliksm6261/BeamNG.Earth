@@ -501,6 +501,7 @@ function M.update(dt, anchor, player)
   local mpanchor = require('beamngEarth/mpanchor')
   mpanchor.install()            -- (a no-op once installed, and until BeamMP's positionGE has loaded)
   require('beamngEarth/mptraffic').update(dt)
+  require('beamngEarth/mpnet').update(dt, anchor, M.others())
   clock = clock + (dt or 0)
   statusIn = statusIn - (dt or 0)
   if statusIn <= 0 then
@@ -657,6 +658,7 @@ function M.reset()
   stats, statusIn = { anchors = 0, go = 0, poses = 0, converged = 0, peers = 0 }, M.STATUS_S
   require('beamngEarth/mpanchor').reset()
   require('beamngEarth/mptraffic').reset()
+  require('beamngEarth/mpnet').reset()
 end
 
 -- The other players for the world map: { { name, lat, lon, h } } (h: heading in degrees from true north, nil when
