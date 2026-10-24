@@ -1907,14 +1907,15 @@ end
 -- public / console API
 
 -- kind: 'teleport' (M.teleport) or 'start' (the level start's), for the recent places list; 'tool'
--- (M.teleport with opts.record == false: test tools like tools/benchmark.lua) is not recorded
-teleportTo = function(lat, lon, name, kind)
+-- (M.teleport with opts.record == false: test tools like tools/benchmark.lua, a BeamMP join, a far car) is not recorded.
+-- anywhere: true lets a test tool go outside the edition's region (M.teleport with opts.anywhere == true)
+teleportTo = function(lat, lon, name, kind, anywhere)
   lat, lon = tonumber(lat), tonumber(lon)
   if not lat or not lon or lat < -90 or lat > 90 or lon < -180 or lon > 180 then
     setStatus('Teleport: invalid lat/lon')
     return false
   end
-  if kind ~= 'tool' and not region.contains(lat, lon) then
+  if not anywhere and not region.contains(lat, lon) then
     log('I', 'beamngEarth', string.format('teleport to %.5f, %.5f refused: outside %s', lat, lon, region.name()))
     -- the level start must land somewhere (a remembered place from before the region, a random place outside it)
     if kind == 'start' and region.contains(DEFAULT_LAT, DEFAULT_LON) then
@@ -1971,10 +1972,11 @@ function M.rebaseTo(lat, lon)
 end
 
 -- name (optional): the place's name for the recent places (places.lua; the settings page's Go);
--- opts (optional): { record = false } keeps it out of the recent places (test tools)
+-- opts (optional): { record = false } keeps it out of the recent places (test tools, BeamMP joins, far cars);
+-- { anywhere = true } lets a test tool go outside the edition's region (region.lua)
 function M.teleport(lat, lon, name, opts)
   local kind = (type(opts) == 'table' and opts.record == false) and 'tool' or 'teleport'
-  return teleportTo(lat, lon, name, kind)
+  return teleportTo(lat, lon, name, kind, type(opts) == 'table' and opts.anywhere == true)
 end
 
 function M.toggleUI() ui.visible = not ui.visible end

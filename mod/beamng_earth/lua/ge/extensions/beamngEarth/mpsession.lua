@@ -217,10 +217,10 @@ local function testStep(dt)
       local q = veh:getPosition()
       local lat, lon = anchorRef:enuToGeodetic(q.x, q.y, q.z)
       note('away', lat, lon)
-      c.teleport(lat, (lon + 130 + 180) % 360 - 180, nil, { record = false })
+      c.teleport(lat, (lon + 130 + 180) % 360 - 180, nil, { record = false, anywhere = true })
     elseif #awayLog == 1 and testClock - awayLog[1].t > M.TEST_AWAY_HOLD_S then
       note('back', awayLog[1].lat, awayLog[1].lon)
-      c.teleport(awayLog[1].lat, awayLog[1].lon, nil, { record = false })
+      c.teleport(awayLog[1].lat, awayLog[1].lon, nil, { record = false, anywhere = true })
     end
   end
   if test.drive and testOwnId and not test.driving and veh and testClock - testCarAt > M.TEST_DRIVE_S then
