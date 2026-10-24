@@ -8,7 +8,8 @@ real curvature of the Earth.
 [Off the Beaten Track](https://offthebeatentrack.world): South Africa, Namibia, Botswana, Zimbabwe, Zambia, Mozambique,
 Lesotho, Eswatini, Malawi and Tanzania. A teleport outside them (from the map, search or saved places) is refused,
 the random start only picks towns inside them
-(`region.lua`, `server/region.py`), and the game starts at Sani Pass. Rebuild the region with
+(`region.lua`, `server/region.py`), and the game starts in Johannesburg, with South Africa's major cities and overland spots as start
+points. Rebuild the region with
 `python3 tools/build_region.py ne_50m_admin_0_countries.geojson` (Natural Earth 1:50m countries); an empty
 `COUNTRIES` list there opens the whole planet again. Based on [TecnaGamer/BeamNG.Earth](https://github.com/TecnaGamer/BeamNG.Earth)
 (MIT).

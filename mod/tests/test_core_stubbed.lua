@@ -209,7 +209,7 @@ serverSend({ type = 'hello', protocol = 4, format = 3, serverVersion = '0.4.0', 
 T.check(pumpUntil(function() return #received('prepare_anchor') == 1 end), 'auto-teleport requested in our level')
 do -- the level start's teleport is the first recent place (places.lua; no file API here: memory only)
   local r = require('beamngEarth/places').recentList()[1]
-  T.check(r and r.kind == 'start' and r.lat == -29.5868 and r.lon == 29.2886,
+  T.check(r and r.kind == 'start' and r.lat == -26.2041 and r.lon == 28.0473,
     'recent places: the level start recorded')
 end
 local function uiShows(pat)
@@ -222,7 +222,7 @@ T.check(not warned('material'), 'hello: the server\'s far-tile material is the o
 T.check(crossover.cells() == 32 and farfield.stats().exactLevel == -2,
   'FORMAT 3 hello (no cells): 32-cell tiles, exact level L-2 (v1.3.1)')
 local req = received('prepare_anchor')[1]
-T.near(req.lat, -29.5868, 1e-9, 'default lat'); T.near(req.lon, 29.2886, 1e-9, 'default lon')
+T.near(req.lat, -26.2041, 1e-9, 'default lat'); T.near(req.lon, 28.0473, 1e-9, 'default lon')
 T.check(req.cx == 0 and req.cy == 0, 'teleport terrain centred at (0,0)')
 
 scenetree.PostFxMotionBlur = { strength = 0.3 } -- the player's motion blur setting

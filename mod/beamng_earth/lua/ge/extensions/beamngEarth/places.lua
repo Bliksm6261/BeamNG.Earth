@@ -23,9 +23,23 @@ M.DEDUP_M = 200   -- a recent place this close to a newer one is the same place
 M.NAME_MAX = 60
 M.ID_MAX = 2 ^ 31 -- ids (and nextId) from the file at or above this are renumbered
 
--- The first run's list. The Off the Beaten Track edition: overland spots across the countries it covers (region.lua), one or more per
--- country. Approximate positions (from memory, not yet snapped to the nearest road with server randomplace.road_spot).
+-- The first run's list (the level select's start points, levelinfo.lua). The Off the Beaten Track edition: South
+-- Africa's major cities first (the owner, 2026-10-24: "users could choose a starting point as a major city in south
+-- africa"), then overland spots across the countries it covers (region.lua). City centres and approximate positions
+-- (from memory, not yet snapped to the nearest road with server randomplace.road_spot).
 M.SEED = {
+  { name = 'Johannesburg', lat = -26.2041, lon = 28.0473 },
+  { name = 'Pretoria', lat = -25.7461, lon = 28.1881 },
+  { name = 'Cape Town', lat = -33.9249, lon = 18.4241 },
+  { name = 'Durban', lat = -29.8587, lon = 31.0218 },
+  { name = 'Gqeberha (Port Elizabeth)', lat = -33.9608, lon = 25.6022 },
+  { name = 'Bloemfontein', lat = -29.0852, lon = 26.1596 },
+  { name = 'East London', lat = -33.0153, lon = 27.9116 },
+  { name = 'Pietermaritzburg', lat = -29.6006, lon = 30.3794 },
+  { name = 'Polokwane', lat = -23.9045, lon = 29.4689 },
+  { name = 'Mbombela (Nelspruit)', lat = -25.4658, lon = 30.9853 },
+  { name = 'Kimberley', lat = -28.7282, lon = 24.7499 },
+  { name = 'George', lat = -33.9630, lon = 22.4617 },
   { name = 'Sani Pass, Sani Top (Lesotho)', lat = -29.5868, lon = 29.2886 },
   { name = 'Chapman\'s Peak Drive, Cape Town', lat = -34.0886, lon = 18.3606 },
   { name = 'Richtersveld, Sendelingsdrift', lat = -28.1167, lon = 16.8833 },

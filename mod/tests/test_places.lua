@@ -43,8 +43,8 @@ local F = places.FILE
 
 local list = places.list() -- lazy load
 T.check(#list == #places.SEED and #list >= 12, 'first run: the seed list (' .. #list .. ')')
-T.check(list[1].name:match('Sani Pass') and list[1].lat == -29.5868 and list[1].lon == 29.2886,
-  'seed: Sani Pass first (the edition\'s default start, core.lua)')
+T.check(list[1].name == 'Johannesburg' and list[1].lat == -26.2041 and list[1].lon == 28.0473,
+  'seed: Johannesburg first (the edition\'s default start, core.lua)')
 do
   local seedNames, ok = {}, true
   for _, s in ipairs(places.SEED) do seedNames[s.name] = true end
@@ -54,7 +54,7 @@ end
 local names = {}
 for _, p in ipairs(list) do names[#names + 1] = p.name end
 names = table.concat(names, '|')
-for _, want in ipairs({ 'Richtersveld', 'Kgalagadi', 'Namibia', 'Botswana', 'Zimbabwe', 'Zambia',
+for _, want in ipairs({ 'Pretoria', 'Cape Town', 'Durban', 'Gqeberha', 'Bloemfontein', 'Sani Pass', 'Richtersveld', 'Kgalagadi', 'Namibia', 'Botswana', 'Zimbabwe', 'Zambia',
   'Mozambique', 'Eswatini', 'Malawi', 'Tanzania' }) do
   T.check(names:find(want, 1, true) ~= nil, 'seed has ' .. want)
 end

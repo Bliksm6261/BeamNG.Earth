@@ -103,8 +103,9 @@ local FLOOR_HIT_M = 0.8        -- m the static collision found under floorZ + 2 
 local PRE_LIFT = 5             -- m above groundZ + 1 to hold the vehicle until it is placed
 local LOADING_AFTER_TELEPORT_S = 3 -- governor loading mode (8 ms budget) this long after a teleport
 local SLOW_SPEED, SLOW_S = 1, 3    -- ... and while the player is below 1 m/s for over 3 s
-local DEFAULT_LAT, DEFAULT_LON = -29.5868, 29.2886     -- Sani Top, the head of Sani Pass (Lesotho side), inside the
-                                                         -- edition's region (region.lua); upstream: Whitney Portal Road
+local DEFAULT_LAT, DEFAULT_LON = -26.2041, 28.0473     -- Johannesburg, inside the edition's region (region.lua; the
+                                                         -- other cities are start points: places.SEED); upstream:
+                                                         -- Whitney Portal Road
 -- The server cannot move the block when it is not connected, has not said hello, or does not answer
 -- terrain requests: one unanswered for STUCK_S, or a terrain_error within ERROR_HOLD_S. Only then
 -- does the edge guard run.
