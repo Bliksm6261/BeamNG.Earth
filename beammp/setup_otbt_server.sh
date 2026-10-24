@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The Off the Beaten Track BeamMP server on a fresh Ubuntu VPS (OTBT's: beamng.offthebeatentrack.world), in one go:
 #
-#   sudo AUTHKEY=<key from https://keymaster.beammp.com> bash setup_otbt_server.sh
+#   sudo bash setup_otbt_server.sh      (asks for the AuthKey from https://keymaster.beammp.com the first time)
 #
 # What it does (again on a re-run: it updates the server and the edition, and keeps ServerConfig.toml):
 #   1. installs what BeamMP's server needs (apt), and git + python3 to build the edition's files
@@ -75,6 +75,8 @@ echo "   $ZIP"
 unzip -o -q "$ZIP" -d "$DIR"
 
 if [ ! -f "$DIR/ServerConfig.toml" ]; then
+  # asked here when not given: typed at this prompt it stays out of the process list (sudo AUTHKEY=... shows in ps)
+  if [ -z "${AUTHKEY:-}" ] && [ -t 0 ]; then read -rsp "BeamMP AuthKey (https://keymaster.beammp.com): " AUTHKEY; echo; fi
   [ -n "${AUTHKEY:-}" ] || { echo "AUTHKEY is needed the first time (https://keymaster.beammp.com)"; exit 1; }
   echo "== ServerConfig.toml"
   cat > "$DIR/ServerConfig.toml" <<EOF

@@ -6,7 +6,7 @@ with the normal BeamMP launcher.
 ## Off the Beaten Track's server
 
 On an Ubuntu VPS, `setup_otbt_server.sh` (beside this file in the repository) does all of the steps below:
-`sudo AUTHKEY=<your key> bash setup_otbt_server.sh` (before the edition is merged: add `BRANCH=otbt-branding`).
+`sudo bash setup_otbt_server.sh` (it asks for your AuthKey; before the edition is merged: `sudo BRANCH=otbt-branding bash ...`).
 First lock the VPS down like OTBT's other servers with `harden_otbt_server.sh` (Tailscale, SSH over Tailscale only,
 key-only logins with Tailscale SSH off, UFW, fail2ban, automatic updates; the game's port 30814 stays public):
 `sudo TS_AUTHKEY=<tailscale auth key> SSH_PUBKEY="<your id_ed25519.pub>" bash harden_otbt_server.sh`.
