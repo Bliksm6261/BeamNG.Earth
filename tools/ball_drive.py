@@ -101,7 +101,7 @@ if car then car:setActive(1); be:enterVehicle(0, car) end
 local ball = st.ballId and getObjectByID(st.ballId)
 if ball then ball:delete() end
 commands.setGameCamera()
-local ok = car and beamngEarth_core.teleport(%r, %r)
+local ok = car and beamngEarth_core.teleport(%r, %r, nil, { anywhere = true })
 BNGE_BALL = nil
 return 'restored car ' .. tostring(st.carId) .. ' teleport ' .. tostring(ok)'''
 
@@ -127,7 +127,7 @@ def main():
                     'return jsonEncode({ lat = s.player.lat, lon = s.player.lon })')
     print('home', home, flush=True)
     if a.lat is not None and a.lon is not None:
-        lua(f'return beamngEarth_core.teleport({a.lat}, {a.lon})')
+        lua(f'return beamngEarth_core.teleport({a.lat}, {a.lon}, nil, {{ anywhere = true }})')
         for _ in range(90):
             time.sleep(2)
             st = lua_json('local s = loadstring("return " .. beamngEarth_core.status())() '

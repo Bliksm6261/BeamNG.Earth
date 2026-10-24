@@ -447,7 +447,7 @@ def main():
     mcp.quiet_ui()          # (the recording too: our welcome page closed and kept away this session)
     if a.start:
         aid0 = lua("return tostring(beamngEarth_core._state().anchorId)").strip()
-        lua("return tostring(beamngEarth_core.teleport(%r, %r, 'autodrive_perf start', {record = false}))" % a.start)
+        lua("return tostring(beamngEarth_core.teleport(%r, %r, 'autodrive_perf start', {record = false, anywhere = true}))" % a.start)
         # the game teleports once the server answers (after a server restart that was ~85 s later: the snap and the
         # drive ran at the old place, Cluj 2026-10-15): the settle counts from the arrival, a new anchor (an old one at
         # the same place does not count: A9 2026-10-15)

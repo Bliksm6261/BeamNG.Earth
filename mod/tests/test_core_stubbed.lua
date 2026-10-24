@@ -209,7 +209,7 @@ serverSend({ type = 'hello', protocol = 4, format = 3, serverVersion = '0.4.0', 
 T.check(pumpUntil(function() return #received('prepare_anchor') == 1 end), 'auto-teleport requested in our level')
 do -- the level start's teleport is the first recent place (places.lua; no file API here: memory only)
   local r = require('beamngEarth/places').recentList()[1]
-  T.check(r and r.kind == 'start' and r.lat == 36.596718 and r.lon == -118.169991,
+  T.check(r and r.kind == 'start' and r.lat == -26.2041 and r.lon == 28.0473,
     'recent places: the level start recorded')
 end
 local function uiShows(pat)
@@ -222,7 +222,7 @@ T.check(not warned('material'), 'hello: the server\'s far-tile material is the o
 T.check(crossover.cells() == 32 and farfield.stats().exactLevel == -2,
   'FORMAT 3 hello (no cells): 32-cell tiles, exact level L-2 (v1.3.1)')
 local req = received('prepare_anchor')[1]
-T.near(req.lat, 36.596718, 1e-9, 'default lat'); T.near(req.lon, -118.169991, 1e-9, 'default lon')
+T.near(req.lat, -26.2041, 1e-9, 'default lat'); T.near(req.lon, 28.0473, 1e-9, 'default lon')
 T.check(req.cx == 0 and req.cy == 0, 'teleport terrain centred at (0,0)')
 
 scenetree.PostFxMotionBlur = { strength = 0.3 } -- the player's motion blur setting
@@ -577,18 +577,23 @@ T.check(uiShows('Imagery: USGS The National Map') and uiShows('EOX') and uiShows
 
 -- console teleport validation
 T.check(core.teleport(91, 0) == false, 'invalid lat rejected')
-T.check(core.teleport(46.5, 7.9) == true, 'console teleport accepted')
+T.check(core.teleport(46.5, 7.9) == false, 'console teleport outside the edition\'s region refused (region.lua)')
+frames(1)
+T.check(uiShows('this edition covers South Africa'), 'the refused teleport says which countries the edition covers')
+T.check(core.teleport(-22.5, 14.5) == true, 'console teleport accepted (Namibia)')
 do
   local places = require('beamngEarth/places')
   local r = places.recentList()[1]
-  T.check(r.kind == 'teleport' and r.lat == 46.5 and r.lon == 7.9 and r.name == nil, 'recent places: a console teleport recorded')
+  T.check(r.kind == 'teleport' and r.lat == -22.5 and r.lon == 14.5 and r.name == nil, 'recent places: a console teleport recorded')
   local n = #places.recentList()
   T.check(core.teleport(91, 0) == false and #places.recentList() == n, 'recent places: a refused teleport is not recorded')
-  core.teleport(46.5001, 7.9, 'Named')
+  core.teleport(-22.5001, 14.5, 'Named')
   T.check(#places.recentList() == n and places.recentList()[1].name == 'Named', 'recent places: teleport(lat, lon, name) records the name')
   local n2, top = #places.recentList(), places.recentList()[1]
-  T.check(core.teleport(10.5, 20.5, nil, { record = false }) == true and #places.recentList() == n2
-    and places.recentList()[1] == top, 'recent places: a tool teleport (record = false) is not recorded')
+  T.check(core.teleport(10.5, 20.5, nil, { record = false }) == false,
+    'an unrecorded teleport (a BeamMP join, a far car) outside the region: refused all the same')
+  T.check(core.teleport(10.5, 20.5, nil, { record = false, anywhere = true }) == true and #places.recentList() == n2
+    and places.recentList()[1] == top, 'recent places: a tool teleport (record = false, anywhere) is not recorded')
 end
 T.check(core.setFarBudget(3) == 3 and core.setFarBudget(10) == 4, 'far budget setter (governor target, 1-4 ms)')
 

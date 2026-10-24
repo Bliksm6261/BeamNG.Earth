@@ -23,44 +23,56 @@ M.DEDUP_M = 200   -- a recent place this close to a newer one is the same place
 M.NAME_MAX = 60
 M.ID_MAX = 2 ^ 31 -- ids (and nextId) from the file at or above this are renumbered
 
--- The first run's list (docs/PLACES.md first table, then well-known drives): each on a public road, on the ground
--- (2026-10-20, the user: "some teleport the player in a building or on a hill": Fells Point's point was inside a
--- building, Echo Point's on the cliff edge at 74 %, Mount Whitney's summit and the Kern River ravine 3 km from any
--- road; each was moved to the nearest road, server randomplace.road_spot, or to a road nearby with the same view).
+-- The first run's list (the level select's start points, levelinfo.lua). The Off the Beaten Track edition: South
+-- Africa's major cities first (the owner, 2026-10-24: "users could choose a starting point as a major city in south
+-- africa"), then overland spots across the countries it covers (region.lua). City centres and approximate positions
+-- (from memory, not yet snapped to the nearest road with server randomplace.road_spot).
 M.SEED = {
-  { name = 'Fells Point, Baltimore MD', lat = 39.283309, lon = -76.593484 },
-  { name = 'Mount Whitney, Whitney Portal Road', lat = 36.596718, lon = -118.169991 },
-  { name = 'Kern River Canyon, CA-178', lat = 35.460552, lon = -118.771223 },
-  { name = 'Monument Valley mesas', lat = 36.78624, lon = -110.139875 },
-  { name = 'Arizona / Utah state line, US-163', lat = 36.99664, lon = -110.176367 },
-  { name = 'El Capitan Meadow, Yosemite', lat = 37.72098, lon = -119.638981 },
-  { name = 'Pikes Peak summit, Colorado', lat = 38.840612, lon = -105.044051 },
-  { name = 'Mount Fuji, Subaru Line 5th station', lat = 35.395301, lon = 138.732839 },
-  { name = 'Everest North Base Camp, Tibet', lat = 28.14141, lon = 86.851111 },
-  { name = 'Stelvio Pass, Italy', lat = 46.528634, lon = 10.453422 },
-  { name = 'Blue Mountains, Echo Point NSW', lat = -33.731908, lon = 150.312007 },
-  -- (the user, 2026-10-21: "remove that solar panel farm from the default places and add my current location")
-  { name = 'Entz Béla út, Pécs, Hungary', lat = 46.099176, lon = 18.218798 },
+  { name = 'Johannesburg', lat = -26.2041, lon = 28.0473 },
+  { name = 'Pretoria', lat = -25.7461, lon = 28.1881 },
+  { name = 'Cape Town', lat = -33.9249, lon = 18.4241 },
+  { name = 'Durban', lat = -29.8587, lon = 31.0218 },
+  { name = 'Gqeberha (Port Elizabeth)', lat = -33.9608, lon = 25.6022 },
+  { name = 'Bloemfontein', lat = -29.0852, lon = 26.1596 },
+  { name = 'East London', lat = -33.0153, lon = 27.9116 },
+  { name = 'Pietermaritzburg', lat = -29.6006, lon = 30.3794 },
+  { name = 'Polokwane', lat = -23.9045, lon = 29.4689 },
+  { name = 'Mbombela (Nelspruit)', lat = -25.4658, lon = 30.9853 },
+  { name = 'Kimberley', lat = -28.7282, lon = 24.7499 },
+  { name = 'George', lat = -33.9630, lon = 22.4617 },
+  { name = 'Sani Pass, Sani Top (Lesotho)', lat = -29.5868, lon = 29.2886 },
+  { name = 'Chapman\'s Peak Drive, Cape Town', lat = -34.0886, lon = 18.3606 },
+  { name = 'Richtersveld, Sendelingsdrift', lat = -28.1167, lon = 16.8833 },
+  { name = 'Kgalagadi, Twee Rivieren', lat = -26.4733, lon = 20.6122 },
+  { name = 'Sossusvlei, Dune 45 (Namibia)', lat = -24.7348, lon = 15.4699 },
+  { name = 'Swakopmund, Skeleton Coast road (Namibia)', lat = -22.6784, lon = 14.5266 },
+  { name = 'Maun, Okavango gateway (Botswana)', lat = -19.9833, lon = 23.4167 },
+  { name = 'Victoria Falls (Zimbabwe)', lat = -17.9318, lon = 25.8307 },
+  { name = 'Livingstone (Zambia)', lat = -17.8419, lon = 25.8543 },
+  { name = 'Tofo Beach (Mozambique)', lat = -23.8517, lon = 35.5442 },
+  { name = 'Mbabane (Eswatini)', lat = -26.3167, lon = 31.1333 },
+  { name = 'Cape Maclear, Lake Malawi', lat = -14.0222, lon = 34.8436 },
+  { name = 'Serengeti, Seronera (Tanzania)', lat = -2.4500, lon = 34.8236 },
 }
 
 -- The earlier first-run list's places as they were (a player's list keeps them until they edit them): one still at
 -- its old name and position moves to its new entry (`to`: the name of its entry in M.SEED; false: left as it is,
 -- the place no longer in the first-run list) when the file is read.
 M.OLD_SEED = {
-  { name = 'Fells Point, Baltimore MD', lat = 39.2834, lon = -76.5934, to = 'Fells Point, Baltimore MD' },
-  { name = 'Mount Whitney summit', lat = 36.5785, lon = -118.2923, to = 'Mount Whitney, Whitney Portal Road' },
-  { name = 'Kern River ravine (Sierra Nevada)', lat = 36.506422, lon = -118.402437, to = 'Kern River Canyon, CA-178' },
-  { name = 'Monument Valley mesas', lat = 36.7818, lon = -110.1393, to = 'Monument Valley mesas' },
+  { name = 'Fells Point, Baltimore MD', lat = 39.2834, lon = -76.5934, to = false },
+  { name = 'Mount Whitney summit', lat = 36.5785, lon = -118.2923, to = false },
+  { name = 'Kern River ravine (Sierra Nevada)', lat = 36.506422, lon = -118.402437, to = false },
+  { name = 'Monument Valley mesas', lat = 36.7818, lon = -110.1393, to = false },
   { name = 'Arizona / Utah state line, Monument Valley', lat = 36.998218, lon = -110.102293,
-    to = 'Arizona / Utah state line, US-163' },
+    to = false },
   { name = 'Kayenta PV Solar Plant, Arizona', lat = 36.7874, lon = -110.2382, to = false },
-  { name = 'El Capitan Meadow, Yosemite', lat = 37.7225, lon = -119.6385, to = 'El Capitan Meadow, Yosemite' },
-  { name = 'Pikes Peak summit, Colorado', lat = 38.8405, lon = -105.0442, to = 'Pikes Peak summit, Colorado' },
+  { name = 'El Capitan Meadow, Yosemite', lat = 37.7225, lon = -119.6385, to = false },
+  { name = 'Pikes Peak summit, Colorado', lat = 38.8405, lon = -105.0442, to = false },
   { name = 'Mount Fuji, Subaru Line 5th station', lat = 35.3953, lon = 138.7330,
-    to = 'Mount Fuji, Subaru Line 5th station' },
-  { name = 'Everest North Base Camp, Tibet', lat = 28.1414, lon = 86.8514, to = 'Everest North Base Camp, Tibet' },
-  { name = 'Stelvio Pass, Italy', lat = 46.5286, lon = 10.4532, to = 'Stelvio Pass, Italy' },
-  { name = 'Blue Mountains, Echo Point NSW', lat = -33.7320, lon = 150.3115, to = 'Blue Mountains, Echo Point NSW' },
+    to = false },
+  { name = 'Everest North Base Camp, Tibet', lat = 28.1414, lon = 86.8514, to = false },
+  { name = 'Stelvio Pass, Italy', lat = 46.5286, lon = 10.4532, to = false },
+  { name = 'Blue Mountains, Echo Point NSW', lat = -33.7320, lon = 150.3115, to = false },
 }
 
 local function seedNamed(name)
