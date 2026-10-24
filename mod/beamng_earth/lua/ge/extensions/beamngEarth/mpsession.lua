@@ -187,7 +187,7 @@ local function testStep(dt)
     local c = core()
     if c then
       log('I', 'beamngEarth', string.format('BeamMP test: to %.5f, %.5f', test.gotoLat, test.gotoLon))
-      c.teleport(test.gotoLat, test.gotoLon, nil, { record = false })
+      c.teleport(test.gotoLat, test.gotoLon, nil, { record = false, anywhere = true })
     end
   end
   if test.map and not test.mapOpened and stats.poses > 0 and testClock > M.TEST_MAP_S then
