@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Lock down OTBT's BeamMP VPS the way OTBT's other servers are (otbt docs: infrastructure/networking.md, the 2026-04-08
-# security audit): Tailscale with SSH, SSH reachable over Tailscale only, key-only logins as ehnadmin, UFW deny-by-default,
+# security audit): Tailscale, SSH reachable over Tailscale only, key-only logins as ehnadmin, UFW deny-by-default,
 # fail2ban, automatic security updates. The only public port left is the game's (30814 TCP+UDP).
 #
 #   sudo TS_AUTHKEY=tskey-auth-... SSH_PUBKEY="ssh-ed25519 AAAA... chad@EHN-Laptop" bash harden_otbt_server.sh
@@ -37,13 +37,13 @@ fi
 chown "$ADMIN:$ADMIN" "$AK"; chmod 600 "$AK"
 [ -s "$AK" ] || { echo "no SSH key for $ADMIN: pass SSH_PUBKEY=\"ssh-ed25519 ...\""; exit 1; }
 
-echo "== Tailscale (with Tailscale SSH)"
+echo "== Tailscale (OpenSSH over it, keys only: Tailscale SSH stays off, it would let the tailnet in without a key)"
 command -v tailscale >/dev/null || curl -fsSL https://tailscale.com/install.sh | sh
 if ! tailscale ip -4 >/dev/null 2>&1; then
   [ -n "${TS_AUTHKEY:-}" ] || { echo "Tailscale is not up: pass TS_AUTHKEY=tskey-auth-..."; exit 1; }
-  tailscale up --ssh --authkey="$TS_AUTHKEY" --hostname="$HOSTNAME_TS"
+  tailscale up --ssh=false --authkey="$TS_AUTHKEY" --hostname="$HOSTNAME_TS"
 else
-  tailscale set --ssh --hostname="$HOSTNAME_TS"
+  tailscale set --ssh=false --hostname="$HOSTNAME_TS"
 fi
 TSIP=$(tailscale ip -4 2>/dev/null | head -1)
 [ -n "$TSIP" ] || { echo "Tailscale did not come up; the firewall and SSH were not changed"; exit 1; }
