@@ -6,6 +6,8 @@
 -- still signed out after LOGIN_WAIT_S plays as a guest (MPCoreNetwork.login(), BeamMP's own "Play as guest").
 -- Once per game start: after a join (or GIVE_UP_S without BeamMP being ready, or a player already in a session) it
 -- does nothing more, so leaving the server is the player's choice. Off: edition.autoJoin false or no server.host.
+-- Leaving a server with mods makes BeamMP reload the game's Lua (MPCoreNetwork.leaveServer); 'done' survives that
+-- through the engine's onSerialize / onDeserialized (core.lua), and resets with a new game start.
 
 local M = {}
 
@@ -74,6 +76,12 @@ function M.update(dt, settings)
   log('I', 'beamngEarth', string.format('autojoin: joining %s (%s:%d)', s.name or s.host, s.host, s.port or 30814))
   call(m, 'connectToServer', s.host, s.port or 30814, s.name or s.host, true)
   state = 'done'
+end
+
+-- the engine's Lua reload (core.lua onSerialize / onDeserialized): keep 'done' so a reload is not a new game start
+function M.serialize() return { done = state == 'done' } end
+function M.deserialize(d)
+  if type(d) == 'table' and d.done == true then state = 'done' end
 end
 
 -- tests

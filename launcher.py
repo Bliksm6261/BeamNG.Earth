@@ -927,8 +927,11 @@ def run(args):
                 exe = beammp_launch.ensure(data_dir(), say)
                 if exe:
                     row("Game", f"starting through BeamMP ({exe})")
-                    beammp_launch.start(exe, ["-gfx", args.gfx] if args.gfx else [])
-                    multiplayer = True
+                    try:
+                        beammp_launch.start(exe, ["-gfx", args.gfx] if args.gfx else [])
+                        multiplayer = True
+                    except OSError as e:       # a broken BeamMP install: the game without multiplayer
+                        row("Game", f"BeamMP did not start ({e}); starting without multiplayer")
             if not multiplayer:
                 proc = start_game(not args.no_gcpatch, build, args.gfx, user_dir)
         say()

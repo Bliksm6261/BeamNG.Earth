@@ -2180,5 +2180,8 @@ M.onClientEndMission = onClientEndMission
 M.onClientPostStartMission = onClientPostStartMission
 M.onExtensionLoaded = onExtensionLoaded
 M.onExtensionUnloaded = onExtensionUnloaded
+-- across a Lua reload (BeamMP reloads after leaving a server): only autojoin's one-shot state
+M.onSerialize = function() return { autojoin = autojoin.serialize() } end
+M.onDeserialized = function(d) autojoin.deserialize(type(d) == 'table' and d.autojoin) end
 
 return M

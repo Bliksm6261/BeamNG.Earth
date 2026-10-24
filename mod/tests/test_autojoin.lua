@@ -87,6 +87,19 @@ aj._reset()
 run(1, 1, settingsWith(true))
 T.check(#MPCoreNetwork.calls == 1, 'the switch on: joins')
 
+-- a Lua reload (BeamMP's after leaving a server) after the join: still done, no second join
+aj._reset(); _G.MPCoreNetwork = fakeMP()
+MPCoreNetwork.launcher, MPCoreNetwork.loggedIn = true, true
+run(1, 1)
+local saved = aj.serialize()
+aj._reset(); aj.deserialize(saved)
+run(3, 1)
+T.check(#MPCoreNetwork.calls == 1 and aj.state() == 'done', 'after a Lua reload: not joined again')
+aj._reset(); aj.deserialize({ done = false })
+T.check(aj.state() == 'waiting', 'a reload before the join: still joins')
+aj.deserialize(nil)
+T.check(aj.state() == 'waiting', 'nothing saved: a new game start')
+
 -- a BeamMP function that throws: logged, not fatal
 aj._reset(); _G.MPCoreNetwork = fakeMP()
 MPCoreNetwork.isLauncherConnected = function() error('boom') end
