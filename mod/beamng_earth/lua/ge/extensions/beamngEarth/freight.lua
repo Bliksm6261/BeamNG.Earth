@@ -219,6 +219,23 @@ function M.getCompany()
   return companyState.company
 end
 
+function M.setCompanyName(name)
+  if type(name) ~= 'string' then return false, 'Name must be a string' end
+  name = name:match('^%s*(.-)%s*$') or ''
+  if #name == 0 then return false, 'Name cannot be empty' end
+  if #name > 64 then name = name:sub(1, 64) end
+
+  companyState.company.name = name
+  M.saveState()
+
+  broadcastLogistics({
+    type = 'set_company_name',
+    name = name
+  })
+
+  return true, name
+end
+
 function M.getActiveContract()
   return companyState.activeContract
 end
@@ -575,6 +592,17 @@ function M.onRemoteLogistics(msg)
       companyState.activeContract = msg.state.activeContract
     end
     M.saveState()
+    return
+  end
+
+  if msg.type == 'set_company_name' then
+    if type(msg.name) == 'string' and #msg.name > 0 then
+      companyState.company.name = msg.name
+      M.saveState()
+      if rawget(_G, 'guihooks') and guihooks.trigger then
+        guihooks.trigger('Message', { ttl = 5, msg = string.format("[OTBT Freight] Group renamed to: %s", msg.name), category = 'freight' })
+      end
+    end
     return
   end
 

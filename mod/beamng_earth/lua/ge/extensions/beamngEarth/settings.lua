@@ -588,6 +588,12 @@ function M.uiFreightSpawnTrailer()
   return { ok = ok, result = res }
 end
 
+function M.uiFreightSetCompanyName(name)
+  local freight = require('beamngEarth/freight')
+  local ok, res = freight.setCompanyName(name)
+  return { ok = ok, name = res }
+end
+
 -- Overlanding Expeditions & Home Base UI Bridge
 function M.uiExpeditionState()
   local core = ext('beamngEarth_core')

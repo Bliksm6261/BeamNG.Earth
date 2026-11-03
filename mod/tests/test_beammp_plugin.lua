@@ -127,6 +127,11 @@ do
   rep, target = G.onLogistics(1, { type = 'expedition_complete', expeditionId = 'tour_test' }, 'Alpha')
   T.check(rep and rep.type == 'expedition_complete' and target == -1, 'expedition_complete broadcast')
   T.check(G.logistics.activeExpedition == nil, 'active expedition cleared on complete')
+
+  -- 8. set_company_name
+  rep, target = G.onLogistics(1, { type = 'set_company_name', name = 'Kalahari Express' }, 'Alpha')
+  T.check(rep and rep.type == 'set_company_name' and target == -1, 'set_company_name broadcast')
+  T.check(G.logistics.company.name == 'Kalahari Express', 'server updated group name')
 end
 
 T.done('test_beammp_plugin')

@@ -174,6 +174,13 @@ function G.onLogistics(pid, msg, playerName)
     return { type = 'sync_state', state = G.logistics }, pid
   end
 
+  if msg.type == 'set_company_name' then
+    if type(msg.name) == 'string' and #msg.name > 0 and #msg.name <= 64 then
+      G.logistics.company.name = msg.name
+      return { type = 'set_company_name', name = msg.name, playerName = playerName }, -1
+    end
+  end
+
   if msg.type == 'accept' then
     if type(msg.contract) == 'table' then
       G.logistics.activeContract = msg.contract

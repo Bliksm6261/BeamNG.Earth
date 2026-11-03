@@ -246,7 +246,15 @@
           <div class="freight-title">
             <span class="freight-icon">{{ hqTab === 'base' ? '🏠' : (hqTab === 'overland' ? '🧭' : '🚚') }}</span>
             <div>
-              <div class="company-name">Off the Beaten Track &middot; Operations HQ</div>
+              <div class="company-name-row">
+                <span v-if="!editingGroupName" class="company-name">{{ freightData.company ? freightData.company.name : 'OTBT Logistics Co-op' }}</span>
+                <div v-else class="group-rename-box" @click.stop>
+                  <input v-model="groupNameInput" class="group-name-input" maxlength="40" placeholder="Enter group name..." @keydown.enter="saveGroupName" />
+                  <button class="map-btn tiny primary" @click="saveGroupName">Save</button>
+                  <button class="map-btn tiny" @click="editingGroupName = false">Cancel</button>
+                </div>
+                <button v-if="!editingGroupName" class="rename-icon-btn" title="Rename Group / Company" @click="startRenameGroup">✏️</button>
+              </div>
               <div class="company-meta">
                 Base: <strong>{{ expData.homeBase ? expData.homeBase.name : 'Johannesburg HQ' }}</strong> &middot;
                 Vault: <strong class="vault-val">${{ freightData.company ? freightData.company.vault.toLocaleString() : '25,000' }}</strong> &middot;
@@ -586,6 +594,26 @@ const hqOpen = ref(false)
 const hqTab = ref('base')
 const freightData = ref({ company: null, activeContract: null, availableJobs: [], canDeliver: false })
 const expData = ref({ homeBase: null, passport: {}, tours: [], activeTour: null, checkpointIndex: 1, currentCheckpoint: null, distanceToCheckpointM: null })
+
+const editingGroupName = ref(false)
+const groupNameInput = ref("")
+
+function startRenameGroup() {
+  groupNameInput.value = (freightData.value.company && freightData.value.company.name) || 'OTBT Logistics Co-op'
+  editingGroupName.value = true
+}
+
+function saveGroupName() {
+  const name = (groupNameInput.value || '').trim()
+  if (!name) {
+    editingGroupName.value = false
+    return
+  }
+  engineLua(`beamngEarth_settings.uiFreightSetCompanyName(${luaStr(name)})`, () => {
+    editingGroupName.value = false
+    pollFreight()
+  })
+}
 
 function pollFreight() {
   engineLua("beamngEarth_settings and beamngEarth_settings.uiFreightState and beamngEarth_settings.uiFreightState() or nil", f => {
@@ -1803,7 +1831,19 @@ const fmtLatLon = mm.fmtLatLon
 }
 .freight-title { display: flex; align-items: center; gap: 12px; }
 .freight-icon { font-size: 28px; }
+.company-name-row { display: flex; align-items: center; gap: 8px; }
 .company-name { font-size: 17px; font-weight: 700; color: #fff; }
+.rename-icon-btn {
+  background: transparent; border: none; font-size: 13px; cursor: pointer; padding: 2px 4px;
+  opacity: 0.6; transition: opacity 0.2s, transform 0.2s; border-radius: 4px; line-height: 1;
+}
+.rename-icon-btn:hover { opacity: 1; transform: scale(1.15); background: rgba(255, 255, 255, 0.1); }
+.group-rename-box { display: flex; align-items: center; gap: 6px; }
+.group-name-input {
+  background: #0f1218; border: 1px solid #ff9500; border-radius: 4px; color: #fff;
+  font-size: 14px; font-weight: 600; padding: 3px 8px; outline: none; width: 220px;
+}
+.map-btn.tiny { font-size: 11px; padding: 3px 8px; min-height: 24px; }
 .company-meta { font-size: 12px; color: #9aa4ae; margin-top: 2px; }
 .vault-val { color: #28a745; font-size: 13px; }
 .close-btn { font-size: 16px; padding: 4px 10px; cursor: pointer; }

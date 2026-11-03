@@ -227,6 +227,18 @@ do
   })
   T.check(freight.getActiveContract() == nil, 'remote finalize cleared active contract')
   T.check(freight.getCompany().vault == 114000, 'remote finalize credited company vault')
+
+  -- Set group name locally
+  local setOk, newName = freight.setCompanyName('Kalahari Heavy Haulers')
+  T.check(setOk, 'setCompanyName succeeded')
+  T.check(freight.getCompany().name == 'Kalahari Heavy Haulers', 'company name updated locally')
+
+  -- Remote group rename
+  freight.onRemoteLogistics({
+    type = 'set_company_name',
+    name = 'Trans-Africa Convoy Co-op'
+  })
+  T.check(freight.getCompany().name == 'Trans-Africa Convoy Co-op', 'remote set_company_name synced')
 end
 
 T.done('test_freight')
