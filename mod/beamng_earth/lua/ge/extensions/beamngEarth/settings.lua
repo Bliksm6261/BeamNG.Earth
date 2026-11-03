@@ -753,6 +753,26 @@ function M.uiRecoveryState()
   return recovery.getUiState(pl and pl.lat, pl and pl.lon, pVeh)
 end
 
+-- African Corridor Traffic & Wildlife Hazards UI Bridge
+function M.uiTrafficState()
+  local core = ext('beamngEarth_core')
+  local st = core and core._state and core._state() or nil
+  local pl = st and st.player
+  local ct = require('beamngEarth/corridor_traffic')
+  return ct.getUiState(pl and pl.lat, pl and pl.lon)
+end
+
+function M.uiTrafficSetDensity(density)
+  local ct = require('beamngEarth/corridor_traffic')
+  return { ok = true, density = ct.setDensity(density) }
+end
+
+function M.uiTrafficSpawn(density)
+  local ct = require('beamngEarth/corridor_traffic')
+  local ok, res = ct.spawnCorridorTraffic(density)
+  return { ok = ok, result = res }
+end
+
 -- Overlanding Expeditions & Home Base UI Bridge
 function M.uiExpeditionState()
   local core = ext('beamngEarth_core')

@@ -69,6 +69,7 @@ local convoy = require('beamngEarth/convoy')           -- CB radio and convoy ra
 local african_weather = require('beamngEarth/african_weather') -- African weather & mud physics
 local bushcamp = require('beamngEarth/bushcamp')       -- overland bush camp & rooftop tent
 local recovery = require('beamngEarth/recovery')       -- vehicle winch recovery & field repair
+local corridor_traffic = require('beamngEarth/corridor_traffic') -- African corridor traffic & wildlife hazards
 local collisionfoci = require('beamngEarth/collisionfoci') -- other vehicles' collision islands
 local terrainpatch = require('beamngEarth/terrainpatch')   -- ground under the islands off the terrain block
 local farcars = require('beamngEarth/farcars')             -- far player cars saved, taken out and put back
@@ -1636,6 +1637,7 @@ local function onUpdate(dtReal, dtSim)
   if st.inOurLevel then freight.update(st.player and st.player.lat, st.player and st.player.lon, getPlayerVehicle(0)) end
   if st.inOurLevel then expeditions.update(st.player and st.player.lat, st.player and st.player.lon) end
   if st.inOurLevel then african_weather.update(st.player and st.player.lat, st.player and st.player.lon, getPlayerVehicle(0)) end
+  if st.inOurLevel then corridor_traffic.update(st.player and st.player.lat, st.player and st.player.lon, getPlayerVehicle(0)) end
   seasonlook.update(st.inOurLevel, st.anchor and st.anchor.lat)
   t = mark('ui', t)
   local frameMs = frameMs0
@@ -1873,6 +1875,7 @@ local function onClientEndMission()
   pcall(african_weather.reset)
   pcall(bushcamp.reset)
   pcall(recovery.reset)
+  pcall(corridor_traffic.reset)
   do local stg = rawget(_G, 'beamngEarth_settings') if stg and stg.redirectBigMap then stg.redirectBigMap(false) end end
   seasonlook.restore()
   -- runs before the level deletes its objects (server/server.lua:19 vs :34): delete the far tiles
