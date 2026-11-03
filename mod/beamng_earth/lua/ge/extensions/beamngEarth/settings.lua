@@ -541,6 +541,125 @@ function M.uiGpsRoute()
   return require('beamngEarth/gps').route()
 end
 
+-- Freight & Logistics Co-op UI Bridge
+function M.uiFreightState()
+  local core = ext('beamngEarth_core')
+  local st = core and core._state and core._state() or nil
+  local pl = st and st.player
+  local freight = require('beamngEarth/freight')
+  return freight.getUiState(pl and pl.lat, pl and pl.lon)
+end
+
+function M.uiFreightAccept(jobId, slotIndex)
+  local core = ext('beamngEarth_core')
+  local st = core and core._state and core._state() or nil
+  local pl = st and st.player
+  local freight = require('beamngEarth/freight')
+  local jobs = freight.getAvailableJobs(pl and pl.lat, pl and pl.lon)
+  for _, j in ipairs(jobs) do
+    if j.id == jobId then
+      local ok, res = freight.acceptContract(j, 1, 'Player 1', slotIndex or 1)
+      return { ok = ok, contract = res }
+    end
+  end
+  return { ok = false, error = 'Contract not found' }
+end
+
+function M.uiFreightClaim(slotIndex)
+  local freight = require('beamngEarth/freight')
+  local ok, res = freight.claimSlot(slotIndex or 1)
+  return { ok = ok, slot = res }
+end
+
+function M.uiFreightDeliver(slotIndex)
+  local freight = require('beamngEarth/freight')
+  local ok, res = freight.deliverSlot(slotIndex or 1)
+  return { ok = ok, manifest = res }
+end
+
+function M.uiFreightAbandon()
+  local freight = require('beamngEarth/freight')
+  return { ok = freight.abandonContract() }
+end
+
+function M.uiFreightSpawnTrailer()
+  local freight = require('beamngEarth/freight')
+  local ok, res = freight.spawnContractTrailer()
+  return { ok = ok, result = res }
+end
+
+-- Overlanding Expeditions & Home Base UI Bridge
+function M.uiExpeditionState()
+  local core = ext('beamngEarth_core')
+  local st = core and core._state and core._state() or nil
+  local pl = st and st.player
+  local expeditions = require('beamngEarth/expeditions')
+  return expeditions.getUiState(pl and pl.lat, pl and pl.lon)
+end
+
+function M.uiExpeditionStart(tourId)
+  local expeditions = require('beamngEarth/expeditions')
+  local ok, res = expeditions.startExpedition(tourId)
+  return { ok = ok, tour = res }
+end
+
+function M.uiExpeditionBeginTrail()
+  local expeditions = require('beamngEarth/expeditions')
+  local ok, res = expeditions.beginTrail()
+  return { ok = ok, tour = res }
+end
+
+function M.uiExpeditionFastTravel()
+  local expeditions = require('beamngEarth/expeditions')
+  local ok, res = expeditions.fastTravelToTrailhead()
+  return { ok = ok and true or false, error = res }
+end
+
+function M.uiExpeditionAbandon()
+  local expeditions = require('beamngEarth/expeditions')
+  return { ok = expeditions.abandonExpedition() }
+end
+
+function M.uiHomeBaseSet(name, lat, lon, kind, address)
+  local expeditions = require('beamngEarth/expeditions')
+  if lat == nil or lon == nil then
+    local core = ext('beamngEarth_core')
+    local st = core and core._state and core._state() or nil
+    local pl = st and st.player
+    if pl and pl.lat and pl.lon then
+      lat, lon = pl.lat, pl.lon
+      name = name or 'Field Camp'
+      kind = kind or 'field_camp'
+    end
+  end
+  local ok, res = expeditions.setHomeBase(name, lat, lon, kind, address)
+  return { ok = ok, homeBase = res }
+end
+
+function M.uiHomeBaseSetCity(cityId)
+  local expeditions = require('beamngEarth/expeditions')
+  local ok, res = expeditions.setHomeBaseByCity(cityId)
+  return { ok = ok, homeBase = res }
+end
+
+function M.uiHomeBaseTravel()
+  local expeditions = require('beamngEarth/expeditions')
+  local ok, err = expeditions.teleportToHomeBase()
+  return { ok = ok and true or false, error = err }
+end
+
+function M.uiSpawnOverlandRig()
+  local expeditions = require('beamngEarth/expeditions')
+  local ok, res = expeditions.spawnOverlandRig()
+  return { ok = ok, vehicle = res }
+end
+
+function M.uiSpawnSemiTruck()
+  local expeditions = require('beamngEarth/expeditions')
+  local ok, res = expeditions.spawnSemiTruck()
+  return { ok = ok, vehicle = res }
+end
+
 -- The map's search-as-you-type: send (q -> { id } or { error }) and poll (id -> nil while waiting, else
 -- { results = {{name, detail, kind, lat, lon}...}, error }). Biased toward the player.
 local geocodeId = 0

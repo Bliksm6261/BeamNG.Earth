@@ -415,6 +415,21 @@ local function onPeers(data)
   log('I', 'beamngEarth', string.format('BeamMP: %d player(s) share our anchor\'s generation', #d.members))
 end
 
+local function onLogistics(data)
+  local ok, d = pcall(jsonDecode, data)
+  if not ok or type(d) ~= 'table' then return end
+  local fr = rawget(_G, 'beamngEarth_freight') or (extensions and extensions.beamngEarth_freight)
+  if not fr then pcall(function() fr = require('beamngEarth/freight') end) end
+  if fr and fr.onRemoteLogistics then
+    pcall(fr.onRemoteLogistics, d)
+  end
+  local exp = rawget(_G, 'beamngEarth_expeditions') or (extensions and extensions.beamngEarth_expeditions)
+  if not exp then pcall(function() exp = require('beamngEarth/expeditions') end) end
+  if exp and exp.onRemoteExpedition then
+    pcall(exp.onRemoteExpedition, d)
+  end
+end
+
 -- Onto the anchor of the players near us when it is not ours (pickAnchor, everyone's anchors with ours): a smooth
 -- rebase (core.rebaseTo). Every player applies the same rule, so a group ends on one anchor; a car ahead that
 -- rebased takes the ones following onto its new anchor.
@@ -488,6 +503,7 @@ function M.update(dt, anchor, player)
     AddEventHandler('bngeGoTo', onGoTo, 'beamngEarth')
     AddEventHandler('bngePeers', onPeers, 'beamngEarth')
     AddEventHandler('bngeConfig', onConfig, 'beamngEarth')
+    AddEventHandler('bngeLogistics', onLogistics, 'beamngEarth')
     handlers = true
   end
   local mpanchor = require('beamngEarth/mpanchor')

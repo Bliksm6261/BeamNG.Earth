@@ -10,7 +10,7 @@
 -- Pure apart from guihooks (runs under plain luajit with a stub).
 local M = {}
 
-M.NAMES = { status = true, credits = true, banner = true }
+M.NAMES = { status = true, credits = true, banner = true, freight = true }
 M.SEND_S = 0.25           -- s between updates to the apps (the status bar's fps changes every frame)
 M.STALE_S = 5.0           -- an unchanged payload is sent again this often (an app opened since)
 
@@ -43,11 +43,14 @@ function M.payload(t)
     banner = (b.visible and b.text ~= '' and b.text) or '',
     bannerLevel = b.level or 'info',
     hidden = t.hidden and true or false,
+    freight = t.freight or nil,
   }
 end
 
 local function key(p)
-  return p.status .. '\1' .. p.loading .. '\1' .. p.credits .. '\1' .. p.banner .. '\1' .. p.bannerLevel .. '\1' .. tostring(p.hidden)
+  local f = p.freight and p.freight.activeContract
+  local fk = f and (f.id .. '\1' .. tostring(math.floor(f.currentDistanceM or 0))) or ''
+  return p.status .. '\1' .. p.loading .. '\1' .. p.credits .. '\1' .. p.banner .. '\1' .. p.bannerLevel .. '\1' .. tostring(p.hidden) .. '\1' .. fk
 end
 
 -- now: core's clock (s); get(): the texts (only called when a send is due, so its cost is paid at SEND_S at most).

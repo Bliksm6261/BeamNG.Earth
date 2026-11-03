@@ -1,0 +1,20 @@
+{
+  "domElement": "<beamng-earth-freight></beamng-earth-freight>",
+  "name": "BeamNG.Earth: Freight Logistics",
+  "types": [
+    "ui.apps.categories.utility"
+  ],
+  "description": "Active trucking contract, cargo condition, convoy status and delivery prompt (BeamNG.Earth).",
+  "css": {
+    "top": "80px",
+    "height": "75px",
+    "width": "420px"
+  },
+  "author": "BeamNG.Earth",
+  "version": "1.0",
+  "directive": "beamngEarthFreight",
+  "appName": "beamngEarthFreight",
+  "category": "BeamNG.Earth",
+  "isAuxiliary": false,
+  "interactive": "no"
+}

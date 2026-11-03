@@ -1,0 +1,662 @@
+-- Freight & Logistics Co-op Simulation for BeamNG.Earth (Off the Beaten Track edition).
+-- Provides deterministic contract generation across regional hubs (seeded by origin and epoch hour),
+-- varied fleet requirements (1-truck solo/express, 2-truck tandem, 3-truck convoy, 4-truck mega haul),
+-- cargo categories (dry, flatbed, tanker, reefer, heavy), multi-consignment slots, real-time cargo
+-- integrity tracking, team damage penalties, and shared company treasury accounting.
+local M = {}
+
+local places = require('beamngEarth/places')
+local gps = require('beamngEarth/gps')
+
+M.FILE = '/settings/beamngEarth_logistics.json'
+M.VERSION = 1
+M.EPOCH_INTERVAL_S = 3600 -- contracts rotate every hour (in-game/real-world epoch)
+
+local lastBroadcastPenalty = {}
+
+local function broadcastLogistics(payload)
+  if rawget(_G, 'TriggerServerEvent') and rawget(_G, 'jsonEncode') then
+    pcall(TriggerServerEvent, 'bngeLogistics', jsonEncode(payload))
+  end
+end
+
+-- Cargo catalog with characteristics and fleet suitability
+M.CARGOS = {
+  -- Solo / Express (1 Truck)
+  { id = 'electronics', name = 'Consumer Electronics', category = 'dry', fragile = true, hazmat = false, minKg = 6000, maxKg = 14000, ratePerKm = 14.5, truckCounts = {1} },
+  { id = 'produce', name = 'Fresh Citrus & Table Grapes', category = 'reefer', fragile = true, hazmat = false, minKg = 12000, maxKg = 22000, ratePerKm = 12.0, truckCounts = {1, 2} },
+  { id = 'auto_parts', name = 'Automotive Assembly Spares', category = 'dry', fragile = false, hazmat = false, minKg = 10000, maxKg = 20000, ratePerKm = 11.0, truckCounts = {1, 2} },
+  { id = 'med_supplies', name = 'Pharmaceuticals & Vaccines', category = 'reefer', fragile = true, hazmat = false, minKg = 5000, maxKg = 12000, ratePerKm = 18.0, truckCounts = {1} },
+
+  -- Duo / Tandem (2 Trucks)
+  { id = 'timber', name = 'Treated Pine Timber & Logs', category = 'flatbed', fragile = false, hazmat = false, minKg = 18000, maxKg = 26000, ratePerKm = 10.5, truckCounts = {2} },
+  { id = 'packaged_goods', name = 'Packaged Retail Merchandise', category = 'dry', fragile = false, hazmat = false, minKg = 14000, maxKg = 22000, ratePerKm = 10.0, truckCounts = {1, 2} },
+  { id = 'beverages', name = 'Bottled Water & Soft Drinks', category = 'dry', fragile = false, hazmat = false, minKg = 16000, maxKg = 25000, ratePerKm = 9.5, truckCounts = {2} },
+
+  -- Convoy / Heavy (3 Trucks)
+  { id = 'diesel', name = 'Refinery Ultra-Low Sulfur Diesel', category = 'tanker', fragile = false, hazmat = true, minKg = 20000, maxKg = 28000, ratePerKm = 16.0, truckCounts = {2, 3} },
+  { id = 'cement', name = 'Bulk Construction Cement', category = 'tanker', fragile = false, hazmat = false, minKg = 22000, maxKg = 28000, ratePerKm = 11.5, truckCounts = {3} },
+  { id = 'mining_explosives', name = 'Commercial Mining Emulsion', category = 'tanker', fragile = true, hazmat = true, minKg = 18000, maxKg = 25000, ratePerKm = 22.0, truckCounts = {3} },
+
+  -- Mega Haul / Heavy Industrial (4 Trucks)
+  { id = 'structural_steel', name = 'Bridge I-Beams & Structural Steel', category = 'flatbed', fragile = false, hazmat = false, minKg = 24000, maxKg = 30000, ratePerKm = 14.0, truckCounts = {3, 4} },
+  { id = 'mining_crusher', name = 'Quarry Jaw Crusher Components', category = 'heavy', fragile = true, hazmat = false, minKg = 25000, maxKg = 32000, ratePerKm = 20.0, truckCounts = {4} },
+  { id = 'copper_cathodes', name = 'Refined Copper Cathode Bundles', category = 'flatbed', fragile = false, hazmat = false, minKg = 22000, maxKg = 28000, ratePerKm = 15.5, truckCounts = {3, 4} },
+  { id = 'wind_blades', name = 'Wind Turbine Hubs & Nacelles', category = 'heavy', fragile = true, hazmat = false, minKg = 20000, maxKg = 28000, ratePerKm = 25.0, truckCounts = {4} }
+}
+
+-- Target truck distribution for an 8-job board:
+-- 3x 1-truck solo jobs, 2x 2-truck duo jobs, 2x 3-truck convoys, 1x 4-truck mega haul
+M.BOARD_DISTRIBUTION = { 1, 1, 1, 2, 2, 3, 3, 4 }
+
+-- 31-bit Lehmer/Park-Miller PRNG (deterministic across platforms and architectures)
+function M.makeRng(seed)
+  local state = math.abs(math.floor(seed)) % 2147483647
+  if state == 0 then state = 123456789 end
+  local function nextInt()
+    state = (state * 48271) % 2147483647
+    return state
+  end
+  local function nextFloat()
+    return nextInt() / 2147483647
+  end
+  local function range(minVal, maxVal)
+    if minVal >= maxVal then return minVal end
+    return minVal + math.floor(nextFloat() * (maxVal - minVal + 1))
+  end
+  return { nextInt = nextInt, nextFloat = nextFloat, range = range }
+end
+
+-- String hash to uint31
+function M.hashString(str)
+  local h = 5381
+  for i = 1, #str do
+    h = ((h * 33) + str:byte(i)) % 2147483647
+  end
+  return h
+end
+
+-- Nearest logistics hub from player position
+function M.findNearestHub(lat, lon, hubs)
+  hubs = hubs or places.SEED
+  local best, bestDist = nil, math.huge
+  for _, h in ipairs(hubs) do
+    local d = places.distance(lat, lon, h.lat, h.lon)
+    if d < bestDist then
+      best = h
+      bestDist = d
+    end
+  end
+  return best, bestDist
+end
+
+-- Filter candidate cargos matching the truck count
+function M.cargosForTrucks(trucksRequired)
+  local list = {}
+  for _, c in ipairs(M.CARGOS) do
+    for _, req in ipairs(c.truckCounts) do
+      if req == trucksRequired then
+        list[#list + 1] = c
+        break
+      end
+    end
+  end
+  if #list == 0 then return M.CARGOS end
+  return list
+end
+
+-- Pure: generate deterministic jobs for a hub and epoch
+function M.generateJobs(originHub, epoch, allHubs)
+  allHubs = allHubs or places.SEED
+  local seed = (M.hashString(originHub.name) * 65537 + epoch * 31) % 2147483647
+  local rng = M.makeRng(seed)
+
+  -- Destination candidates (all hubs except origin)
+  local destCandidates = {}
+  for _, h in ipairs(allHubs) do
+    if h.name ~= originHub.name then
+      destCandidates[#destCandidates + 1] = h
+    end
+  end
+  if #destCandidates == 0 then return {} end
+
+  local jobs = {}
+  for i, trucksReq in ipairs(M.BOARD_DISTRIBUTION) do
+    -- Pick destination
+    local destIdx = rng.range(1, #destCandidates)
+    local dest = destCandidates[destIdx]
+
+    -- Distance estimation (with road curvature factor ~1.25)
+    local straightM = places.distance(originHub.lat, originHub.lon, dest.lat, dest.lon)
+    local roadDistKm = math.max(30, math.floor(straightM * 1.25 / 1000 + 0.5))
+
+    -- Pick cargo for this truck requirement
+    local suitableCargos = M.cargosForTrucks(trucksReq)
+    local cargo = suitableCargos[rng.range(1, #suitableCargos)]
+
+    -- Weight and payout calculations
+    local weightPerTruck = rng.range(cargo.minKg, cargo.maxKg)
+    local totalWeightKg = weightPerTruck * trucksReq
+
+    -- Rate modifiers: Fragile (+25%), HazMat (+40%), Multi-truck group bonus
+    local rateMod = 1.0
+    if cargo.fragile then rateMod = rateMod + 0.25 end
+    if cargo.hazmat then rateMod = rateMod + 0.40 end
+    if trucksReq == 2 then rateMod = rateMod + 0.10
+    elseif trucksReq == 3 then rateMod = rateMod + 0.15
+    elseif trucksReq >= 4 then rateMod = rateMod + 0.25
+    end
+
+    local baseHandlingFee = 600 -- flat terminal fee per vehicle
+    local payoutPerTruck = math.floor((roadDistKm * cargo.ratePerKm * rateMod) + baseHandlingFee)
+    local totalPayout = payoutPerTruck * trucksReq
+
+    -- Consignment slots
+    local slots = {}
+    for s = 1, trucksReq do
+      slots[s] = {
+        slot = s,
+        label = string.format("Consignment %d/%d: %s (%dt)", s, trucksReq, cargo.name, math.floor(weightPerTruck / 1000)),
+        weightKg = weightPerTruck,
+        claimedBy = nil,
+        status = 'open', -- 'open', 'claimed', 'in_transit', 'delivered', 'failed'
+        cargoHealth = 100.0,
+        damagePenalty = 0,
+        grossPayout = payoutPerTruck
+      }
+    end
+
+    -- Deterministic Contract ID (e.g. #JH-8401)
+    local prefix = originHub.name:sub(1, 2):upper()
+    local jobId = string.format("#%s-%04d", prefix, (seed + i * 137) % 9000 + 1000)
+
+    jobs[#jobs + 1] = {
+      id = jobId,
+      origin = { name = originHub.name, lat = originHub.lat, lon = originHub.lon },
+      destination = { name = dest.name, lat = dest.lat, lon = dest.lon },
+      cargo = cargo,
+      trucksRequired = trucksReq,
+      weightPerTruckKg = weightPerTruck,
+      totalWeightKg = totalWeightKg,
+      distanceKm = roadDistKm,
+      totalPayout = totalPayout,
+      payoutPerTruck = payoutPerTruck,
+      slots = slots,
+      status = 'available' -- 'available', 'accepted', 'in_transit', 'completed', 'failed'
+    }
+  end
+
+  return jobs
+end
+
+-- Calculate financial penalty for damaged cargo on a consignment
+function M.calculatePenalty(slot, cargo)
+  local health = math.max(0, math.min(100, slot.cargoHealth or 100))
+  if health >= 98 then return 0 end
+  local lostFrac = (100 - health) / 100
+  local penaltyFactor = cargo.fragile and 1.5 or 1.0
+  if cargo.hazmat and health < 50 then
+    penaltyFactor = penaltyFactor * 1.5 -- severe HazMat spill penalty
+  end
+  local penalty = math.floor(slot.grossPayout * lostFrac * penaltyFactor)
+  return math.min(slot.grossPayout, penalty)
+end
+
+-- Company State & Persistence
+local companyState = {
+  company = {
+    name = 'OTBT Logistics Co-op',
+    vault = 25000, -- startup working capital
+    completedDeliveries = 0,
+    totalTonnesHauled = 0,
+    totalEarnings = 0,
+    reputation = 100
+  },
+  activeContract = nil
+}
+
+function M.getCompany()
+  return companyState.company
+end
+
+function M.getActiveContract()
+  return companyState.activeContract
+end
+
+-- Load state from JSON file
+function M.loadState()
+  if rawget(_G, 'jsonReadFile') then
+    local data = jsonReadFile(M.FILE)
+    if type(data) == 'table' and data.company then
+      companyState = data
+      return true
+    end
+  end
+  return false
+end
+
+-- Save state to JSON file
+function M.saveState()
+  if rawget(_G, 'jsonWriteFile') then
+    return jsonWriteFile(M.FILE, companyState, true)
+  end
+  return false
+end
+
+-- Get current market jobs for the player's coordinate
+function M.getAvailableJobs(lat, lon, epoch)
+  epoch = epoch or math.floor(os.time() / M.EPOCH_INTERVAL_S)
+  local originHub = M.findNearestHub(lat, lon)
+  if not originHub then return {} end
+  return M.generateJobs(originHub, epoch)
+end
+
+-- Trailer models matching cargo categories
+function M.trailerModelForCategory(cat)
+  if cat == 'tanker' then return 'tanker' end
+  if cat == 'flatbed' or cat == 'heavy' then return 'flatbed' end
+  return 'dryvan'
+end
+
+-- Spawn a matching trailer hitched behind the current player vehicle
+function M.spawnContractTrailer()
+  local c = companyState.activeContract
+  if not c or not c.cargo then return false, 'No active contract' end
+  local pVeh = rawget(_G, 'getPlayerVehicle') and getPlayerVehicle(0)
+  if not pVeh then return false, 'No player vehicle found' end
+
+  local pos = pVeh:getPosition()
+  local dir = pVeh:getDirectionVector()
+  -- place trailer ~8.5m behind the truck
+  local spawnPos = vec3(pos.x - dir.x * 8.5, pos.y - dir.y * 8.5, pos.z + 0.5)
+  local rot = quat(0, 0, 1, 0) * quat(pVeh:getRefNodeRotation())
+
+  local model = M.trailerModelForCategory(c.cargo.category)
+  if rawget(_G, 'core_vehicles') and core_vehicles.spawnNewVehicle then
+    local ok, trailer = pcall(core_vehicles.spawnNewVehicle, model, {
+      pos = spawnPos,
+      rot = rot,
+      autoEnterVehicle = false
+    })
+    return ok, trailer
+  end
+  return false, 'core_vehicles unavailable'
+end
+
+-- Accept a contract from the market
+function M.acceptContract(job, playerPid, playerName, slotIndex)
+  if companyState.activeContract and companyState.activeContract.status == 'in_transit' then
+    return false, 'A contract is already in transit'
+  end
+
+  slotIndex = slotIndex or 1
+  if slotIndex < 1 or slotIndex > job.trucksRequired then
+    return false, 'Invalid consignment slot'
+  end
+
+  job.status = 'in_transit'
+  job.acceptedAt = os.time()
+  job.slots[slotIndex].claimedBy = playerName or tostring(playerPid or 'Driver 1')
+  job.slots[slotIndex].status = 'in_transit'
+
+  companyState.activeContract = job
+  M.saveState()
+
+  -- Broadcast accept to convoy/server
+  broadcastLogistics({
+    type = 'accept',
+    contract = job,
+    slotIndex = slotIndex,
+    playerName = job.slots[slotIndex].claimedBy,
+    pid = playerPid
+  })
+
+  -- Route GPS to destination
+  if gps and gps.setDestination then
+    gps.setDestination(job.destination.lat, job.destination.lon, job.destination.name)
+  end
+
+  return true, job
+end
+
+-- Claim an open consignment slot in an active multi-truck contract
+function M.claimSlot(slotIndex, playerPid, playerName)
+  local c = companyState.activeContract
+  if not c or c.status ~= 'in_transit' then return false, 'No active contract in transit' end
+  if slotIndex < 1 or slotIndex > c.trucksRequired then return false, 'Invalid slot' end
+  local slot = c.slots[slotIndex]
+  if slot.claimedBy ~= nil and slot.status ~= 'open' then return false, 'Slot already claimed' end
+
+  slot.claimedBy = playerName or tostring(playerPid or 'Teammate')
+  slot.status = 'in_transit'
+  M.saveState()
+
+  broadcastLogistics({
+    type = 'claim',
+    jobId = c.id,
+    slotIndex = slotIndex,
+    playerName = slot.claimedBy,
+    pid = playerPid
+  })
+
+  return true, slot
+end
+
+-- Record cargo damage on a claimed slot
+function M.recordDamage(slotIndex, damagePercent)
+  local c = companyState.activeContract
+  if not c or not c.slots[slotIndex] then return false end
+  local slot = c.slots[slotIndex]
+  slot.cargoHealth = math.max(0, math.min(100, 100 - damagePercent))
+  slot.damagePenalty = M.calculatePenalty(slot, c.cargo)
+
+  if lastBroadcastPenalty[slotIndex] ~= slot.damagePenalty then
+    lastBroadcastPenalty[slotIndex] = slot.damagePenalty
+    broadcastLogistics({
+      type = 'damage',
+      jobId = c.id,
+      slotIndex = slotIndex,
+      cargoHealth = slot.cargoHealth,
+      damagePenalty = slot.damagePenalty
+    })
+  end
+
+  return true, slot.cargoHealth, slot.damagePenalty
+end
+
+-- Complete delivery for a slot
+function M.deliverSlot(slotIndex)
+  local c = companyState.activeContract
+  if not c or not c.slots[slotIndex] then return false end
+  local slot = c.slots[slotIndex]
+  slot.status = 'delivered'
+  slot.damagePenalty = M.calculatePenalty(slot, c.cargo)
+
+  broadcastLogistics({
+    type = 'deliver_slot',
+    jobId = c.id,
+    slotIndex = slotIndex,
+    cargoHealth = slot.cargoHealth,
+    damagePenalty = slot.damagePenalty
+  })
+
+  -- Check if all claimed slots are delivered
+  local allDone = true
+  for _, s in ipairs(c.slots) do
+    if s.claimedBy ~= nil and s.status ~= 'delivered' then
+      allDone = false
+      break
+    end
+  end
+
+  if allDone then
+    return M.finalizeContract()
+  end
+
+  M.saveState()
+  return true, 'slot_delivered'
+end
+
+-- Finalize entire contract, deposit to company treasury, update stats
+function M.finalizeContract()
+  local c = companyState.activeContract
+  if not c then return false end
+
+  local grossEarnings = 0
+  local totalPenalties = 0
+  local deliveredWeightKg = 0
+
+  for _, s in ipairs(c.slots) do
+    if s.status == 'delivered' then
+      grossEarnings = grossEarnings + s.grossPayout
+      local pen = M.calculatePenalty(s, c.cargo)
+      totalPenalties = totalPenalties + pen
+      deliveredWeightKg = deliveredWeightKg + s.weightKg
+    end
+  end
+
+  local netPayout = math.max(0, grossEarnings - totalPenalties)
+
+  -- Update company vault and stats
+  local comp = companyState.company
+  comp.vault = comp.vault + netPayout
+  comp.totalEarnings = comp.totalEarnings + netPayout
+  comp.completedDeliveries = comp.completedDeliveries + 1
+  comp.totalTonnesHauled = comp.totalTonnesHauled + math.floor(deliveredWeightKg / 1000)
+
+  -- Reputation adjustment based on penalties
+  local repGain = 2
+  if totalPenalties > (grossEarnings * 0.3) then
+    repGain = -5
+    comp.reputation = math.max(10, comp.reputation - 5)
+  else
+    comp.reputation = math.min(100, comp.reputation + 2)
+  end
+
+  local manifest = {
+    contractId = c.id,
+    origin = c.origin.name,
+    destination = c.destination.name,
+    cargo = c.cargo.name,
+    grossEarnings = grossEarnings,
+    totalPenalties = totalPenalties,
+    netPayout = netPayout,
+    companyVault = comp.vault,
+    reputation = comp.reputation
+  }
+
+  broadcastLogistics({
+    type = 'finalize',
+    jobId = c.id,
+    netPayout = netPayout,
+    tonnes = math.floor(deliveredWeightKg / 1000),
+    reputationDelta = repGain
+  })
+
+  c.status = 'completed'
+  c.manifest = manifest
+  companyState.activeContract = nil
+  M.saveState()
+
+  return true, manifest
+end
+
+-- Update loop: monitors active contract, tracks damage, and detects arrival
+local lastDamageCheck = 0
+local baselineDamage = {}
+
+function M.getVehicleDamage(veh)
+  if not veh then return 0 end
+  local id = veh:getID()
+  local o = id and rawget(_G, 'map') and map.objects and map.objects[id]
+  local total = o and tonumber(o.damage) or 0
+
+  -- If a trailer is coupled via core_trailerRespawn, check its damage too
+  local tr = rawget(_G, 'core_trailerRespawn')
+  local getC = tr and (tr.getCouplingDetails or tr.getCouplings)
+  local cMap = getC and pcall(getC) and getC()
+  if type(cMap) == 'table' and cMap[id] and cMap[id].trailerId then
+    local tid = tonumber(cMap[id].trailerId)
+    local to = tid and rawget(_G, 'map') and map.objects and map.objects[tid]
+    total = total + (to and tonumber(to.damage) or 0)
+  end
+  return total
+end
+
+function M.update(playerLat, playerLon, playerVeh)
+  local c = companyState.activeContract
+  if not c or c.status ~= 'in_transit' then return end
+
+  local now = os.clock()
+
+  -- Check vehicle damage accumulation every 0.5s
+  if now - lastDamageCheck >= 0.5 then
+    lastDamageCheck = now
+    if playerVeh then
+      local vehId = playerVeh:getID()
+      local currentDmg = M.getVehicleDamage(playerVeh)
+
+      if baselineDamage[vehId] == nil then
+        baselineDamage[vehId] = currentDmg
+      else
+        local delta = math.max(0, currentDmg - baselineDamage[vehId])
+        -- Damage curve: <200 = 0% loss, 200..10000 = scaled 1%..100% loss
+        local damagePercent = 0
+        if delta > 200 then
+          damagePercent = math.min(100, (delta - 200) / 7800 * 100)
+        end
+        -- Find our claimed slot (default to slot 1 if solo)
+        for sIdx, slot in ipairs(c.slots) do
+          if slot.status == 'in_transit' then
+            M.recordDamage(sIdx, damagePercent)
+            break
+          end
+        end
+      end
+    end
+  end
+
+  -- Arrival detection: within 40m of destination coordinates
+  if playerLat and playerLon and c.destination then
+    local distM = places.distance(playerLat, playerLon, c.destination.lat, c.destination.lon)
+    c.currentDistanceM = distM
+
+    if distM <= 40 then
+      local speed = playerVeh and playerVeh.getVelocity and playerVeh:getVelocity():length() or 0
+      if speed < 1.0 and not c.canDeliverPrompted then
+        c.canDeliverPrompted = true
+        if rawget(_G, 'ui_message') then
+          pcall(ui_message, string.format("Destination reached: %s. Stop and complete delivery in the logistics menu.", c.destination.name), 8, 'beamngEarthFreight')
+        end
+      end
+    end
+  end
+end
+
+-- UI State representation for HUD and menus
+function M.getUiState(playerLat, playerLon)
+  local c = companyState.activeContract
+  local available = {}
+  if playerLat and playerLon then
+    available = M.getAvailableJobs(playerLat, playerLon)
+  end
+
+  return {
+    company = companyState.company,
+    activeContract = c,
+    availableJobs = available,
+    canDeliver = c and c.currentDistanceM and c.currentDistanceM <= 40
+  }
+end
+
+-- Abandon contract
+function M.abandonContract()
+  local c = companyState.activeContract
+  if not c then return false end
+  broadcastLogistics({
+    type = 'abandon',
+    jobId = c.id
+  })
+  companyState.company.reputation = math.max(10, companyState.company.reputation - 10)
+  companyState.activeContract = nil
+  M.saveState()
+  return true
+end
+
+-- Remote event handler from BeamMP server
+function M.onRemoteLogistics(msg)
+  if type(msg) ~= 'table' or type(msg.type) ~= 'string' then return end
+
+  if msg.type == 'sync_state' then
+    if msg.state and type(msg.state.company) == 'table' then
+      companyState.company = msg.state.company
+    end
+    if msg.state and msg.state.activeContract ~= nil then
+      companyState.activeContract = msg.state.activeContract
+    end
+    M.saveState()
+    return
+  end
+
+  if msg.type == 'accept' then
+    if type(msg.contract) == 'table' then
+      companyState.activeContract = msg.contract
+      M.saveState()
+      if rawget(_G, 'guihooks') and guihooks.trigger then
+        guihooks.trigger('Message', { ttl = 6, msg = string.format("[OTBT Freight] %s accepted convoy contract: %s", msg.playerName or 'Teammate', msg.contract.cargo.name), category = 'freight' })
+      end
+      if gps and gps.setDestination and msg.contract.destination then
+        gps.setDestination(msg.contract.destination.lat, msg.contract.destination.lon, msg.contract.destination.name)
+      end
+    end
+    return
+  end
+
+  if msg.type == 'claim' then
+    local c = companyState.activeContract
+    local sIdx = tonumber(msg.slotIndex)
+    if c and c.slots and sIdx and c.slots[sIdx] then
+      c.slots[sIdx].claimedBy = msg.playerName
+      c.slots[sIdx].status = 'in_transit'
+      M.saveState()
+      if rawget(_G, 'guihooks') and guihooks.trigger then
+        guihooks.trigger('Message', { ttl = 5, msg = string.format("[OTBT Freight] %s claimed Consignment %d/%d", msg.playerName or 'Teammate', sIdx, c.trucksRequired), category = 'freight' })
+      end
+    end
+    return
+  end
+
+  if msg.type == 'damage' then
+    local c = companyState.activeContract
+    local sIdx = tonumber(msg.slotIndex)
+    if c and c.slots and sIdx and c.slots[sIdx] then
+      c.slots[sIdx].cargoHealth = tonumber(msg.cargoHealth) or c.slots[sIdx].cargoHealth
+      c.slots[sIdx].damagePenalty = tonumber(msg.damagePenalty) or c.slots[sIdx].damagePenalty
+      M.saveState()
+    end
+    return
+  end
+
+  if msg.type == 'deliver_slot' then
+    local c = companyState.activeContract
+    local sIdx = tonumber(msg.slotIndex)
+    if c and c.slots and sIdx and c.slots[sIdx] then
+      c.slots[sIdx].status = 'delivered'
+      c.slots[sIdx].cargoHealth = tonumber(msg.cargoHealth) or c.slots[sIdx].cargoHealth
+      c.slots[sIdx].damagePenalty = tonumber(msg.damagePenalty) or c.slots[sIdx].damagePenalty
+      M.saveState()
+      if rawget(_G, 'guihooks') and guihooks.trigger then
+        guihooks.trigger('Message', { ttl = 6, msg = string.format("[OTBT Freight] %s delivered Consignment %d/%d!", msg.playerName or 'Teammate', sIdx, c.trucksRequired), category = 'freight' })
+      end
+    end
+    return
+  end
+
+  if msg.type == 'finalize' then
+    if msg.company then
+      companyState.company = msg.company
+    end
+    companyState.activeContract = nil
+    M.saveState()
+    if rawget(_G, 'guihooks') and guihooks.trigger then
+      guihooks.trigger('Message', { ttl = 8, msg = string.format("[OTBT Freight] Contract completed! +$%d added to Company Vault by %s", tonumber(msg.netPayout) or 0, msg.playerName or 'Team'), category = 'freight' })
+    end
+    return
+  end
+
+  if msg.type == 'abandon' then
+    companyState.activeContract = nil
+    M.saveState()
+    if rawget(_G, 'guihooks') and guihooks.trigger then
+      guihooks.trigger('Message', { ttl = 5, msg = string.format("[OTBT Freight] Contract abandoned by %s", msg.playerName or 'Teammate'), category = 'freight' })
+    end
+    return
+  end
+end
+
+-- Reset session
+function M.reset()
+  companyState.activeContract = nil
+end
+
+return M

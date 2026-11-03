@@ -63,6 +63,8 @@ local parking = require('beamngEarth/parking') -- parked cars on the road tiles'
 local navgraph = require('beamngEarth/navgraph')
 local postfx = require('beamngEarth/postfx')       -- no far depth-of-field blur in our level
 local gps = require('beamngEarth/gps')               -- the game's GPS route to a place picked on the world map
+local freight = require('beamngEarth/freight')       -- freight market, multi-truck co-op hauls and damage
+local expeditions = require('beamngEarth/expeditions') -- overlanding tours, 4x4 trails and Home Base
 local collisionfoci = require('beamngEarth/collisionfoci') -- other vehicles' collision islands
 local terrainpatch = require('beamngEarth/terrainpatch')   -- ground under the islands off the terrain block
 local farcars = require('beamngEarth/farcars')             -- far player cars saved, taken out and put back
@@ -222,6 +224,10 @@ local teleportTo -- defined with M.teleport (the level start's own teleport is o
 -- road from the server), else to the window's lat/lon (the default start until it is changed)
 local RANDOM_WAIT_S = 15 -- s for the server's random place (an older server never answers: the default start)
 local function defaultStart()
+  local hb = expeditions and expeditions.getHomeBase and expeditions.getHomeBase()
+  if hb and hb.lat and hb.lon then
+    return teleportTo(hb.lat, hb.lon, hb.name, 'start')
+  end
   local lat, lon = ui.getLatLon(DEFAULT_LAT, DEFAULT_LON)
   return teleportTo(lat, lon, nil, 'start')
 end
@@ -1352,6 +1358,7 @@ local function hudTexts()
   hudInput.credits = st.active and credits.enabled and credits.text(creditsFallback) or ''
   hudInput.banner = (st.inOurLevel or st.active) and banner.enabled and banner.current() or nil
   hudInput.hidden = credits.hiddenByUi()
+  hudInput.freight = shown and freight.getUiState(st.player and st.player.lat, st.player and st.player.lon) or nil
   return hudInput
 end
 
@@ -1621,6 +1628,8 @@ local function onUpdate(dtReal, dtSim)
   local stg = rawget(_G, 'beamngEarth_settings')
   if stg and stg.redirectBigMap then stg.redirectBigMap(st.inOurLevel) end
   if st.inOurLevel then gps.update(st.anchor, st.player) end
+  if st.inOurLevel then freight.update(st.player and st.player.lat, st.player and st.player.lon, getPlayerVehicle(0)) end
+  if st.inOurLevel then expeditions.update(st.player and st.player.lat, st.player and st.player.lon) end
   seasonlook.update(st.inOurLevel, st.anchor and st.anchor.lat)
   t = mark('ui', t)
   local frameMs = frameMs0
@@ -1852,6 +1861,8 @@ local function onClientEndMission()
   pcall(farcars.reset)
   pcall(mpsession.reset)
   gps.reset()
+  pcall(freight.reset)
+  pcall(expeditions.reset)
   do local stg = rawget(_G, 'beamngEarth_settings') if stg and stg.redirectBigMap then stg.redirectBigMap(false) end end
   seasonlook.restore()
   -- runs before the level deletes its objects (server/server.lua:19 vs :34): delete the far tiles
@@ -1876,6 +1887,8 @@ local function onExtensionLoaded()
   -- the level select's spawn points: the saved places (levelinfo.lua), from the main menu on
   pcall(places.list)
   pcall(places.syncLevel)
+  pcall(freight.loadState)
+  pcall(expeditions.loadState)
   -- loaded while a level is already running (e.g. extensions.reload from the console)
   if scenetree.MissionGroup and getCurrentLevelIdentifier() then onLevelStart() end
 end

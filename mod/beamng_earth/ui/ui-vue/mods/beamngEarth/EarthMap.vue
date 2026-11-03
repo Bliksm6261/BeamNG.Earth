@@ -130,6 +130,7 @@
             <span class="layer-hint">(world to city zoom)</span></label>
         </div>
       </div>
+      <button class="map-btn" :class="{ on: hqOpen }" @click="toggleHq" title="OTBT Operations: Home Base, Overlanding &amp; Trucking">OTBT HQ</button>
       <button v-if="!embedded" class="map-btn close" @click="close" title="Close (Esc / M)">Close</button>
     </div>
 
@@ -238,6 +239,312 @@
       </div>
     </div>
 
+    <!-- Unified OTBT Operations & HQ Modal -->
+    <div v-if="hqOpen" class="freight-modal-backdrop" @click="hqOpen = false">
+      <div class="freight-modal" @click.stop @mousedown.stop @wheel.stop>
+        <div class="freight-header">
+          <div class="freight-title">
+            <span class="freight-icon">{{ hqTab === 'base' ? '🏠' : (hqTab === 'overland' ? '🧭' : '🚚') }}</span>
+            <div>
+              <div class="company-name">Off the Beaten Track &middot; Operations HQ</div>
+              <div class="company-meta">
+                Base: <strong>{{ expData.homeBase ? expData.homeBase.name : 'Johannesburg HQ' }}</strong> &middot;
+                Vault: <strong class="vault-val">${{ freightData.company ? freightData.company.vault.toLocaleString() : '25,000' }}</strong> &middot;
+                Rep: <strong>{{ freightData.company ? freightData.company.reputation : 100 }}%</strong>
+              </div>
+            </div>
+          </div>
+          <button class="map-btn close-btn" @click="hqOpen = false">✕</button>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="hq-tabs-bar">
+          <button class="hq-tab-btn" :class="{ active: hqTab === 'base' }" @click="hqTab = 'base'">
+            🏠 Home Base &amp; Garage
+          </button>
+          <button class="hq-tab-btn" :class="{ active: hqTab === 'overland' }" @click="hqTab = 'overland'">
+            🧭 Overlanding Tours
+          </button>
+          <button class="hq-tab-btn" :class="{ active: hqTab === 'freight' }" @click="hqTab = 'freight'">
+            🚚 Trucking Logistics
+          </button>
+        </div>
+
+        <div class="freight-body">
+          <!-- TAB 1: HOME BASE & GARAGE -->
+          <div v-if="hqTab === 'base'" class="base-tab-content">
+            <div class="base-card">
+              <div class="base-header">
+                <span class="tag in-transit">PRIMARY BASECAMP</span>
+                <span class="base-coords">{{ expData.homeBase ? expData.homeBase.lat.toFixed(4) + ', ' + expData.homeBase.lon.toFixed(4) : '' }}</span>
+              </div>
+              <div class="base-title">{{ expData.homeBase ? expData.homeBase.name : 'OTBT Expedition HQ' }}</div>
+              <div class="base-desc">
+                Your designated home location in Southern Africa. Your game automatically spawns you here on level load, and you can fast-travel home anytime.
+              </div>
+              <div class="base-actions">
+                <button class="map-btn primary" @click="travelHomeBase">📍 Fast-Travel to Base</button>
+                <button class="map-btn" @click="setHereAsHomeBase" :disabled="!state.player" title="Establish your Home Base at your car's current position">
+                  📌 Set Current Spot as Home Base
+                </button>
+              </div>
+            </div>
+
+            <!-- Relocate Home Base Options -->
+            <div class="relocate-section">
+              <div class="market-section-title">Change Home Base Location</div>
+
+              <!-- Option A: Major City Bases Picker -->
+              <div class="base-picker-block">
+                <div class="base-picker-sub">Pick from Major African Cities</div>
+                <div class="city-chips-grid">
+                  <button
+                    v-for="city in (expData.cityBases || [])"
+                    :key="city.id"
+                    class="city-chip"
+                    :class="{ active: expData.homeBase && expData.homeBase.name === city.name }"
+                    @click="setCityBase(city.id)"
+                  >
+                    <span class="city-chip-name">{{ city.name }}</span>
+                    <span class="city-chip-country">{{ city.country }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Option B: Custom Address Search (OSM / Photon Geocoding) -->
+              <div class="base-picker-block" style="margin-top: 14px;">
+                <div class="base-picker-sub">Or Enter Any Custom Street Address / Landmark</div>
+                <div class="address-search-row">
+                  <input
+                    v-model="baseAddressQuery"
+                    class="panel-input"
+                    placeholder="e.g. 42 Kloof Street, Cape Town or Victoria Falls Hotel"
+                    @keydown.enter.stop.prevent="searchBaseAddress"
+                    @focus="typing(true)"
+                    @blur="typing(false)"
+                  />
+                  <button class="map-btn primary" @click="searchBaseAddress" :disabled="baseSearching || !baseAddressQuery.trim()">
+                    {{ baseSearching ? 'Searching…' : 'Search' }}
+                  </button>
+                </div>
+
+                <!-- Address Results List -->
+                <div v-if="baseAddressResults.length" class="base-results-list">
+                  <div
+                    v-for="(addr, aIdx) in baseAddressResults"
+                    :key="aIdx"
+                    class="base-result-item"
+                    @click="setAddressBase(addr)"
+                  >
+                    <div class="base-res-name">📍 {{ addr.name }}</div>
+                    <div class="base-res-detail">{{ addr.detail || addr.name }} ({{ addr.lat.toFixed(4) }}, {{ addr.lon.toFixed(4) }})</div>
+                  </div>
+                </div>
+                <div v-if="baseSearchMsg" class="panel-msg warn" style="margin-top: 4px;">{{ baseSearchMsg }}</div>
+              </div>
+            </div>
+
+            <div class="garage-section">
+              <div class="market-section-title">Fleet Garage &middot; Deploy Rig</div>
+              <div class="garage-grid">
+                <div class="garage-card">
+                  <div class="rig-icon">🚙</div>
+                  <div class="rig-info">
+                    <div class="rig-name">Overland 4x4 Cruiser (Gavril Roamer)</div>
+                    <div class="rig-desc">Equipped for trail crawling, rock climbs and desert dune crossings.</div>
+                  </div>
+                  <button class="map-btn primary small" @click="spawnOverlandRig">Spawn &amp; Drive</button>
+                </div>
+                <div class="garage-card">
+                  <div class="rig-icon">🚛</div>
+                  <div class="rig-info">
+                    <div class="rig-name">Commercial Semi-Truck (Gavril T-Series)</div>
+                    <div class="rig-desc">Heavy highway hauler equipped with fifth-wheel hitch for semi-trailers.</div>
+                  </div>
+                  <button class="map-btn primary small" @click="spawnSemiTruck">Spawn &amp; Drive</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="passport-summary">
+              <div class="market-section-title">Expedition Passport &middot; Off-Road Milestones</div>
+              <div class="contract-stats-row">
+                <div class="stat-box">
+                  <span class="stat-lbl">Tours Completed</span>
+                  <span class="stat-val">{{ Object.keys((expData.passport && expData.passport.stamps) || {}).length }}</span>
+                </div>
+                <div class="stat-box">
+                  <span class="stat-lbl">Off-Road Distance</span>
+                  <span class="stat-val highlight">{{ (expData.passport && expData.passport.totalOffroadKm) || 0 }} km</span>
+                </div>
+                <div class="stat-box">
+                  <span class="stat-lbl">Milestones Discovered</span>
+                  <span class="stat-val">{{ (expData.passport && expData.passport.milestonesDiscovered) || 0 }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 2: OVERLANDING EXPEDITIONS -->
+          <div v-else-if="hqTab === 'overland'" class="overland-tab-content">
+            <!-- Active Expedition in Progress or Transit -->
+            <div v-if="expData.activeTour" class="active-contract-card">
+              <div class="active-header">
+                <span class="tag in-transit">
+                  {{ expData.activeTour.status === 'transit' ? 'TRANSIT TO TRAILHEAD' : 'EXPEDITION UNDERWAY' }}
+                </span>
+                <span class="active-id">{{ expData.activeTour.gradeLabel }}</span>
+              </div>
+              <div class="contract-cargo-name">{{ expData.activeTour.name }}</div>
+
+              <!-- Transit State: Driving to Trailhead -->
+              <div v-if="expData.activeTour.status === 'transit'">
+                <div class="contract-route">
+                  Trailhead: <strong>{{ expData.activeTour.checkpoints[0].name }}</strong>
+                  <span class="dist-pill" v-if="expData.activeTour.distToTrailheadM != null">
+                    {{ (expData.activeTour.distToTrailheadM / 1000).toFixed(1) }} km away
+                  </span>
+                </div>
+                <div class="exp-desc-box">
+                  {{ expData.atTrailhead ? '🎉 You have arrived at the trailhead! Click below to start the trail.' : 'Drive your vehicle to the trailhead to begin the expedition.' }}
+                </div>
+                <div class="contract-actions">
+                  <button v-if="expData.atTrailhead" class="map-btn primary deliver-btn" @click="beginTrail">
+                    ⭐ BEGIN EXPEDITION NOW
+                  </button>
+                  <button v-else class="map-btn small" @click="fastTravelTrailhead" title="Skip transit drive and teleport to trailhead">
+                    📍 Fast-Travel to Trailhead
+                  </button>
+                  <button class="map-btn danger small" @click="abandonExpedition">Cancel Trip</button>
+                </div>
+              </div>
+
+              <!-- Active State: On the Trail -->
+              <div v-else>
+                <div class="contract-route">
+                  Stage {{ expData.checkpointIndex }} of {{ expData.activeTour.checkpoints.length }}:
+                  <strong>{{ expData.currentCheckpoint ? expData.currentCheckpoint.name : '' }}</strong>
+                  <span class="dist-pill" v-if="expData.distanceToCheckpointM">
+                    {{ (expData.distanceToCheckpointM / 1000).toFixed(1) }} km away
+                  </span>
+                </div>
+                <div class="exp-desc-box">
+                  {{ expData.currentCheckpoint ? expData.currentCheckpoint.desc : '' }}
+                </div>
+                <div class="contract-actions">
+                  <button class="map-btn danger small" @click="abandonExpedition">Abandon Tour</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Available Curated Tours -->
+            <div v-else class="tours-section">
+              <div class="market-section-title">Curated Southern African Overlanding Routes</div>
+              <div class="tours-grid">
+                <div v-for="tour in (expData.tours || [])" :key="tour.id" class="tour-card">
+                  <div class="job-top">
+                    <span class="grade-badge" :class="'grade-' + tour.grade">{{ tour.gradeLabel }}</span>
+                    <span class="dist-tag">{{ tour.distanceKm }} km</span>
+                  </div>
+                  <div class="tour-name">{{ tour.name }}</div>
+                  <div class="tour-region">📍 {{ tour.region }}</div>
+                  <div class="tour-desc">{{ tour.description }}</div>
+                  <div class="tour-terrain"><strong>Terrain:</strong> {{ tour.terrain }}</div>
+                  <div class="tour-checkpoints">
+                    <div class="chk-hdr">Key Waypoints:</div>
+                    <div v-for="(chk, cIdx) in tour.checkpoints" :key="cIdx" class="chk-item">
+                      <span class="chk-dot"></span> {{ chk.name }}
+                    </div>
+                  </div>
+                  <div class="job-bottom">
+                    <span class="vehicle-rec">🚙 {{ tour.recommendedVehicle }}</span>
+                    <button class="map-btn primary small" @click="startExpedition(tour.id)">🧭 Plan Trip &amp; Route</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 3: TRUCKING & LOGISTICS -->
+          <div v-else-if="hqTab === 'freight'" class="freight-tab-content">
+            <!-- Active Contract in Progress -->
+            <div v-if="freightData.activeContract && freightData.activeContract.status === 'in_transit'" class="active-contract-card">
+              <div class="active-header">
+                <span class="tag in-transit">ACTIVE DISPATCH</span>
+                <span class="active-id">{{ freightData.activeContract.id }}</span>
+              </div>
+              <div class="contract-cargo-name">{{ freightData.activeContract.cargo.name }}</div>
+              <div class="contract-route">
+                📍 <strong>{{ freightData.activeContract.origin.name }}</strong> ➔ <strong>{{ freightData.activeContract.destination.name }}</strong>
+                <span class="dist-pill" v-if="freightData.activeContract.currentDistanceM">
+                  {{ (freightData.activeContract.currentDistanceM / 1000).toFixed(1) }} km left
+                </span>
+              </div>
+
+              <div class="contract-stats-row">
+                <div class="stat-box">
+                  <span class="stat-lbl">Fleet Size</span>
+                  <span class="stat-val">{{ freightData.activeContract.trucksRequired }} Truck{{ freightData.activeContract.trucksRequired > 1 ? 's' : '' }}</span>
+                </div>
+                <div class="stat-box">
+                  <span class="stat-lbl">Cargo Integrity</span>
+                  <span class="stat-val" :style="{ color: freightData.activeContract.slots[0].cargoHealth > 80 ? '#28a745' : '#dc3545' }">
+                    {{ Math.round(freightData.activeContract.slots[0].cargoHealth) }}%
+                  </span>
+                </div>
+                <div class="stat-box">
+                  <span class="stat-lbl">Gross Team Payout</span>
+                  <span class="stat-val highlight">${{ freightData.activeContract.totalPayout.toLocaleString() }}</span>
+                </div>
+              </div>
+
+              <div class="contract-actions">
+                <button class="map-btn small" @click="spawnTrailer" title="Spawn the matching trailer behind your truck">🚚 Spawn Trailer</button>
+                <button v-if="freightData.canDeliver" class="map-btn primary deliver-btn" @click="deliverContract">
+                  ✓ Complete Delivery &amp; Collect Payment
+                </button>
+                <div v-else class="in-transit-hint">
+                  Drive within 40m of {{ freightData.activeContract.destination.name }} to complete delivery.
+                </div>
+                <button class="map-btn danger small" @click="abandonContract">Abandon Job</button>
+              </div>
+            </div>
+
+            <!-- Market Job Listings -->
+            <div v-else class="market-section">
+              <div class="market-section-title">
+                Available Freight Contracts &middot; {{ freightData.availableJobs ? freightData.availableJobs.length : 0 }} Offers
+              </div>
+              <div class="jobs-grid">
+                <div v-for="job in (freightData.availableJobs || [])" :key="job.id" class="job-card">
+                  <div class="job-top">
+                    <span class="job-id-tag">{{ job.id }}</span>
+                    <span class="truck-badge">{{ job.trucksRequired }} Truck{{ job.trucksRequired > 1 ? 's' : '' }}</span>
+                  </div>
+                  <div class="job-name">{{ job.cargo.name }}</div>
+                  <div class="job-tags">
+                    <span v-if="job.cargo.fragile" class="tag fragile">Fragile</span>
+                    <span v-if="job.cargo.hazmat" class="tag hazmat">HazMat</span>
+                    <span class="tag category">{{ job.cargo.category }}</span>
+                  </div>
+                  <div class="job-dest">
+                    ➔ <strong>{{ job.destination.name }}</strong> ({{ job.distanceKm }} km)
+                  </div>
+                  <div class="job-payload">
+                    Payload: {{ Math.round(job.totalWeightKg / 1000) }}t ({{ Math.round(job.weightPerTruckKg / 1000) }}t / truck)
+                  </div>
+                  <div class="job-bottom">
+                    <div class="payout-amount">${{ job.totalPayout.toLocaleString() }}</div>
+                    <button class="map-btn primary small" @click="acceptJob(job.id)">Accept &amp; Route</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- bottom: cursor position, scale, attribution -->
     <div class="map-bottom" :class="{ 'beside-panel': panelOpen }">
       <span class="cursor-pos">{{ cursorText }}</span>
@@ -275,6 +582,163 @@ const seenPlayer = ref(false)
 let pollTimer = null, resizeObs = null
 let drag = null
 
+const hqOpen = ref(false)
+const hqTab = ref('base')
+const freightData = ref({ company: null, activeContract: null, availableJobs: [], canDeliver: false })
+const expData = ref({ homeBase: null, passport: {}, tours: [], activeTour: null, checkpointIndex: 1, currentCheckpoint: null, distanceToCheckpointM: null })
+
+function pollFreight() {
+  engineLua("beamngEarth_settings and beamngEarth_settings.uiFreightState and beamngEarth_settings.uiFreightState() or nil", f => {
+    if (f) freightData.value = f
+  })
+}
+
+function pollExpeditions() {
+  engineLua("beamngEarth_settings and beamngEarth_settings.uiExpeditionState and beamngEarth_settings.uiExpeditionState() or nil", e => {
+    if (e) expData.value = e
+  })
+}
+
+function pollHq() {
+  pollFreight()
+  pollExpeditions()
+}
+
+function toggleHq() {
+  hqOpen.value = !hqOpen.value
+  if (hqOpen.value) pollHq()
+}
+
+function travelHomeBase() {
+  engineLua('beamngEarth_settings.uiHomeBaseTravel()', () => {
+    hqOpen.value = false
+  })
+}
+
+function setHereAsHomeBase() {
+  engineLua('beamngEarth_settings.uiHomeBaseSet()', () => {
+    pollExpeditions()
+  })
+}
+
+const baseAddressQuery = ref("")
+const baseAddressResults = ref([])
+const baseSearching = ref(false)
+const baseSearchMsg = ref("")
+
+function setCityBase(cityId) {
+  engineLua('beamngEarth_settings.uiHomeBaseSetCity("' + cityId + '")', () => {
+    pollExpeditions()
+  })
+}
+
+function searchBaseAddress() {
+  const q = baseAddressQuery.value.trim()
+  if (!q) return
+  baseSearching.value = true
+  baseSearchMsg.value = ""
+  baseAddressResults.value = []
+
+  engineLua(`beamngEarth_settings and beamngEarth_settings.uiGeocode(${luaStr(q)}) or nil`, r => {
+    if (!r || r.error || !r.id) {
+      baseSearching.value = false
+      baseSearchMsg.value = (r && r.error) || "Could not find address"
+      return
+    }
+    let tries = 0
+    const poll = () => {
+      engineLua(`beamngEarth_settings and beamngEarth_settings.uiGeocodeResult(${r.id}) or nil`, res => {
+        if (!res) {
+          if (++tries < 30) setTimeout(poll, 150)
+          else {
+            baseSearching.value = false
+            baseSearchMsg.value = "No response for address search"
+          }
+          return
+        }
+        baseSearching.value = false
+        const hits = toArray(res.results)
+        if (hits.length === 0) {
+          baseSearchMsg.value = "No matching addresses found"
+        } else {
+          baseAddressResults.value = hits.slice(0, 5)
+        }
+      })
+    }
+    poll()
+  })
+}
+
+function setAddressBase(addr) {
+  const name = addr.name || addr.detail || 'Custom Home Base'
+  const detail = addr.detail || addr.name
+  engineLua(`beamngEarth_settings.uiHomeBaseSet(${luaStr(name)}, ${addr.lat}, ${addr.lon}, 'custom_address', ${luaStr(detail)})`, () => {
+    baseAddressResults.value = []
+    baseAddressQuery.value = ""
+    pollExpeditions()
+  })
+}
+
+function spawnOverlandRig() {
+  engineLua('beamngEarth_settings.uiSpawnOverlandRig()', () => {
+    hqOpen.value = false
+  })
+}
+
+function spawnSemiTruck() {
+  engineLua('beamngEarth_settings.uiSpawnSemiTruck()', () => {
+    hqOpen.value = false
+  })
+}
+
+function startExpedition(tourId) {
+  engineLua('beamngEarth_settings.uiExpeditionStart("' + tourId + '")', () => {
+    pollExpeditions()
+  })
+}
+
+function beginTrail() {
+  engineLua('beamngEarth_settings.uiExpeditionBeginTrail()', () => {
+    pollExpeditions()
+  })
+}
+
+function fastTravelTrailhead() {
+  engineLua('beamngEarth_settings.uiExpeditionFastTravel()', () => {
+    pollExpeditions()
+  })
+}
+
+function abandonExpedition() {
+  engineLua('beamngEarth_settings.uiExpeditionAbandon()', () => {
+    pollExpeditions()
+  })
+}
+
+function acceptJob(jobId) {
+  engineLua('beamngEarth_settings.uiFreightAccept("' + jobId + '", 1)', () => {
+    pollFreight()
+  })
+}
+
+function deliverContract() {
+  engineLua('beamngEarth_settings.uiFreightDeliver(1)', () => {
+    pollFreight()
+  })
+}
+
+function abandonContract() {
+  engineLua('beamngEarth_settings.uiFreightAbandon()', () => {
+    pollFreight()
+  })
+}
+
+function spawnTrailer() {
+  engineLua('beamngEarth_settings.uiFreightSpawnTrailer()', () => {
+    pollFreight()
+  })
+}
+
 function engineLua(script, cb) {
   if (!window.bngApi || !window.bngApi.engineLua) return
   window.bngApi.engineLua(script, cb)
@@ -282,6 +746,7 @@ function engineLua(script, cb) {
 
 // ---- state from Lua (every second) -------------------------------------------------------
 function poll() {
+  if (hqOpen.value) pollHq()
   engineLua("beamngEarth_settings and beamngEarth_settings.uiMapState and beamngEarth_settings.uiMapState() or nil", s => {
     if (!s) { state.value = { places: [], recent: [], missing: true }; return }
     state.value = { places: [], recent: [], ...s }
@@ -1321,4 +1786,154 @@ const fmtLatLon = mm.fmtLatLon
 .map-bottom.beside-panel .attribution { max-width: 100%; }
 .map-view { bottom: 0; }
 .earth-map.embedded .map-bottom { bottom: 6px; }
+
+/* Freight & Logistics Modal */
+.freight-modal-backdrop {
+  position: absolute; inset: 0; z-index: 25; background: rgba(0, 0, 0, 0.75);
+  display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);
+}
+.freight-modal {
+  width: 780px; max-height: 85vh; background: #12151c; border: 1px solid rgba(255, 149, 0, 0.4);
+  border-radius: 8px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8); display: flex; flex-direction: column;
+  overflow: hidden; color: #eef1f4;
+}
+.freight-header {
+  padding: 14px 20px; background: #1a1e27; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.freight-title { display: flex; align-items: center; gap: 12px; }
+.freight-icon { font-size: 28px; }
+.company-name { font-size: 17px; font-weight: 700; color: #fff; }
+.company-meta { font-size: 12px; color: #9aa4ae; margin-top: 2px; }
+.vault-val { color: #28a745; font-size: 13px; }
+.close-btn { font-size: 16px; padding: 4px 10px; cursor: pointer; }
+
+.freight-body { padding: 18px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+
+/* Active Dispatch Card */
+.active-contract-card {
+  background: rgba(25, 30, 40, 0.95); border: 2px solid #ff9500; border-radius: 6px; padding: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+.active-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.active-id { font-size: 12px; color: #9aa4ae; font-weight: 600; }
+.contract-cargo-name { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+.contract-route { font-size: 14px; color: #c0c8d4; display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.dist-pill { background: rgba(255, 149, 0, 0.2); color: #ffb54a; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.contract-stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+.stat-box { background: rgba(0, 0, 0, 0.35); border-radius: 4px; padding: 10px; display: flex; flex-direction: column; align-items: center; }
+.stat-lbl { font-size: 11px; text-transform: uppercase; color: #9aa4ae; letter-spacing: 0.05em; }
+.stat-val { font-size: 16px; font-weight: 700; margin-top: 4px; }
+.stat-val.highlight { color: #ff9500; font-size: 18px; }
+.contract-actions { display: flex; gap: 10px; align-items: center; justify-content: flex-end; }
+.deliver-btn { font-size: 14px; font-weight: 700; padding: 8px 16px; background: #28a745 !important; border-color: #28a745 !important; }
+.in-transit-hint { font-size: 12px; color: #9aa4ae; font-style: italic; margin-right: auto; }
+
+/* Market Grid */
+.market-section-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #9aa4ae; margin-bottom: 8px; }
+.jobs-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.job-card {
+  background: rgba(22, 26, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 6px;
+  padding: 12px; display: flex; flex-direction: column; transition: border-color 0.15s ease;
+}
+.job-card:hover { border-color: rgba(255, 149, 0, 0.6); }
+.job-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.job-id-tag { font-size: 11px; color: #9aa4ae; font-weight: 600; }
+.truck-badge { background: rgba(54, 163, 255, 0.2); color: #9fd3ff; border: 1px solid rgba(54, 163, 255, 0.4); font-size: 11px; padding: 2px 6px; border-radius: 3px; font-weight: 600; }
+.job-name { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+.job-tags { display: flex; gap: 4px; margin-bottom: 6px; }
+.tag { font-size: 10px; padding: 1px 5px; border-radius: 3px; font-weight: 600; text-transform: uppercase; }
+.tag.fragile { background: rgba(255, 193, 7, 0.25); color: #ffc107; border: 1px solid rgba(255, 193, 7, 0.4); }
+.tag.hazmat { background: rgba(220, 53, 69, 0.25); color: #dc3545; border: 1px solid rgba(220, 53, 69, 0.4); }
+.tag.category { background: rgba(255, 255, 255, 0.1); color: #c0c8d4; }
+.tag.in-transit { background: #ff9500; color: #000; font-size: 11px; padding: 2px 6px; }
+.job-dest { font-size: 13px; color: #c0c8d4; margin-bottom: 2px; }
+.job-payload { font-size: 11px; color: #9aa4ae; margin-bottom: 10px; }
+.job-bottom { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
+.payout-amount { font-size: 16px; font-weight: 700; color: #ffb54a; }
+
+/* HQ Tabs Bar */
+.hq-tabs-bar {
+  display: flex; background: #151821; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0 16px; gap: 8px;
+}
+.hq-tab-btn {
+  background: transparent; border: none; border-bottom: 3px solid transparent; color: #9aa4ae;
+  padding: 12px 16px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s ease;
+}
+.hq-tab-btn:hover { color: #fff; }
+.hq-tab-btn.active { color: #ff9500; border-bottom-color: #ff9500; }
+
+/* Home Base Card */
+.base-card {
+  background: rgba(25, 30, 42, 0.95); border: 1px solid rgba(255, 149, 0, 0.3); border-radius: 6px;
+  padding: 18px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+.base-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.base-coords { font-size: 12px; color: #9aa4ae; font-family: monospace; }
+.base-title { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+.base-desc { font-size: 13px; color: #c0c8d4; line-height: 1.4; margin-bottom: 14px; }
+.base-actions { display: flex; gap: 10px; }
+
+/* Garage Grid */
+.garage-section { margin-bottom: 16px; }
+.garage-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.garage-card {
+  background: rgba(22, 26, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px;
+  padding: 12px; display: flex; align-items: center; gap: 12px;
+}
+.rig-icon { font-size: 28px; }
+.rig-info { flex: 1; }
+.rig-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 2px; }
+.rig-desc { font-size: 11px; color: #9aa4ae; line-height: 1.3; }
+
+/* Overlanding Tours Grid */
+.tours-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.tour-card {
+  background: rgba(22, 26, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 6px;
+  padding: 14px; display: flex; flex-direction: column; gap: 6px;
+}
+.grade-badge { font-size: 11px; padding: 2px 7px; border-radius: 3px; font-weight: 700; text-transform: uppercase; }
+.grade-1 { background: rgba(40, 167, 69, 0.25); color: #28a745; border: 1px solid rgba(40, 167, 69, 0.4); }
+.grade-2 { background: rgba(23, 162, 184, 0.25); color: #17a2b8; border: 1px solid rgba(23, 162, 184, 0.4); }
+.grade-3 { background: rgba(255, 193, 7, 0.25); color: #ffc107; border: 1px solid rgba(255, 193, 7, 0.4); }
+.grade-4 { background: rgba(253, 126, 20, 0.25); color: #fd7e14; border: 1px solid rgba(253, 126, 20, 0.4); }
+.grade-5 { background: rgba(220, 53, 69, 0.25); color: #dc3545; border: 1px solid rgba(220, 53, 69, 0.4); }
+.dist-tag { font-size: 11px; color: #9aa4ae; font-weight: 600; }
+.tour-name { font-size: 16px; font-weight: 700; color: #fff; }
+.tour-region { font-size: 12px; color: #ffb54a; }
+.tour-desc { font-size: 12px; color: #c0c8d4; line-height: 1.3; }
+.tour-terrain { font-size: 11px; color: #9aa4ae; }
+.tour-checkpoints { background: rgba(0, 0, 0, 0.25); border-radius: 4px; padding: 6px 8px; margin: 4px 0; }
+.chk-hdr { font-size: 10px; text-transform: uppercase; color: #9aa4ae; font-weight: 600; margin-bottom: 2px; }
+.chk-item { font-size: 11px; color: #eef1f4; display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+.chk-dot { width: 5px; height: 5px; border-radius: 50%; background: #ff9500; }
+.vehicle-rec { font-size: 11px; color: #9aa4ae; max-width: 200px; line-height: 1.2; }
+.exp-desc-box { background: rgba(0, 0, 0, 0.3); padding: 8px 12px; border-radius: 4px; font-size: 13px; color: #ffb54a; margin: 8px 0 12px; }
+
+/* Base Relocation & Address Search */
+.relocate-section {
+  background: rgba(22, 26, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px;
+  padding: 14px; margin-bottom: 16px;
+}
+.base-picker-sub { font-size: 12px; font-weight: 600; color: #c0c8d4; margin-bottom: 8px; }
+.city-chips-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-height: 150px; overflow-y: auto; padding-right: 4px; }
+.city-chip {
+  background: rgba(15, 18, 24, 0.9); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px;
+  padding: 6px 8px; text-align: left; cursor: pointer; display: flex; flex-direction: column; transition: all 0.12s ease;
+}
+.city-chip:hover { border-color: #ff9500; background: rgba(255, 149, 0, 0.1); }
+.city-chip.active { border-color: #ff9500; background: rgba(255, 149, 0, 0.2); }
+.city-chip-name { font-size: 12px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.city-chip-country { font-size: 10px; color: #9aa4ae; margin-top: 1px; }
+
+.address-search-row { display: flex; gap: 8px; align-items: center; }
+.base-results-list {
+  background: #151821; border: 1px solid rgba(255, 149, 0, 0.4); border-radius: 4px; margin-top: 6px;
+  max-height: 160px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+}
+.base-result-item { padding: 8px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); cursor: pointer; }
+.base-result-item:hover { background: rgba(255, 149, 0, 0.15); }
+.base-res-name { font-size: 13px; font-weight: 600; color: #fff; }
+.base-res-detail { font-size: 11px; color: #9aa4ae; margin-top: 2px; }
 </style>

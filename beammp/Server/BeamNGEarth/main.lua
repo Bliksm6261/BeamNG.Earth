@@ -151,6 +151,110 @@ function G.config()
   return { sharePort = (port and port >= 1024 and port <= 65535) and port or nil }
 end
 
+-- Shared logistics & expeditions state across players
+G.logistics = {
+  company = {
+    name = 'OTBT Logistics Co-op',
+    vault = 25000,
+    completedDeliveries = 0,
+    totalTonnesHauled = 0,
+    totalEarnings = 0,
+    reputation = 100
+  },
+  activeContract = nil,
+  activeExpedition = nil
+}
+
+-- Pure: handle logistics/expedition events from clients
+function G.onLogistics(pid, msg, playerName)
+  if type(msg) ~= 'table' or type(msg.type) ~= 'string' then return nil, nil end
+  playerName = playerName or ('Player ' .. tostring(pid))
+
+  if msg.type == 'sync_request' then
+    return { type = 'sync_state', state = G.logistics }, pid
+  end
+
+  if msg.type == 'accept' then
+    if type(msg.contract) == 'table' then
+      G.logistics.activeContract = msg.contract
+      return { type = 'accept', contract = msg.contract, slotIndex = msg.slotIndex or 1, playerName = playerName, pid = pid }, -1
+    end
+  end
+
+  if msg.type == 'claim' then
+    local c = G.logistics.activeContract
+    local slotIdx = tonumber(msg.slotIndex)
+    if c and c.slots and slotIdx and c.slots[slotIdx] then
+      c.slots[slotIdx].claimedBy = playerName
+      c.slots[slotIdx].status = 'in_transit'
+      return { type = 'claim', jobId = msg.jobId, slotIndex = slotIdx, playerName = playerName, pid = pid }, -1
+    end
+  end
+
+  if msg.type == 'damage' then
+    local c = G.logistics.activeContract
+    local slotIdx = tonumber(msg.slotIndex)
+    if c and c.slots and slotIdx and c.slots[slotIdx] then
+      c.slots[slotIdx].cargoHealth = tonumber(msg.cargoHealth) or c.slots[slotIdx].cargoHealth
+      c.slots[slotIdx].damagePenalty = tonumber(msg.damagePenalty) or c.slots[slotIdx].damagePenalty
+      return { type = 'damage', jobId = msg.jobId, slotIndex = slotIdx, cargoHealth = c.slots[slotIdx].cargoHealth, damagePenalty = c.slots[slotIdx].damagePenalty, playerName = playerName, pid = pid }, -1
+    end
+  end
+
+  if msg.type == 'deliver_slot' then
+    local c = G.logistics.activeContract
+    local slotIdx = tonumber(msg.slotIndex)
+    if c and c.slots and slotIdx and c.slots[slotIdx] then
+      c.slots[slotIdx].status = 'delivered'
+      c.slots[slotIdx].cargoHealth = tonumber(msg.cargoHealth) or c.slots[slotIdx].cargoHealth
+      c.slots[slotIdx].damagePenalty = tonumber(msg.damagePenalty) or c.slots[slotIdx].damagePenalty
+      return { type = 'deliver_slot', jobId = msg.jobId, slotIndex = slotIdx, playerName = playerName, pid = pid }, -1
+    end
+  end
+
+  if msg.type == 'finalize' then
+    local comp = G.logistics.company
+    local payout = tonumber(msg.netPayout) or 0
+    local tonnes = tonumber(msg.tonnes) or 0
+    comp.vault = comp.vault + payout
+    comp.completedDeliveries = comp.completedDeliveries + 1
+    comp.totalTonnesHauled = comp.totalTonnesHauled + tonnes
+    comp.totalEarnings = comp.totalEarnings + payout
+    if msg.reputationDelta then
+      comp.reputation = math.max(0, math.min(100, comp.reputation + tonumber(msg.reputationDelta)))
+    end
+    G.logistics.activeContract = nil
+    return { type = 'finalize', jobId = msg.jobId, company = comp, netPayout = payout, playerName = playerName }, -1
+  end
+
+  if msg.type == 'abandon' then
+    G.logistics.activeContract = nil
+    return { type = 'abandon', jobId = msg.jobId, playerName = playerName }, -1
+  end
+
+  if msg.type == 'expedition_start' then
+    if type(msg.expedition) == 'table' then
+      G.logistics.activeExpedition = msg.expedition
+      return { type = 'expedition_start', expedition = msg.expedition, playerName = playerName }, -1
+    end
+  end
+
+  if msg.type == 'expedition_stage' then
+    if G.logistics.activeExpedition then
+      G.logistics.activeExpedition.currentCheckpointIndex = tonumber(msg.stage) or G.logistics.activeExpedition.currentCheckpointIndex
+      G.logistics.activeExpedition.status = msg.status or G.logistics.activeExpedition.status
+      return { type = 'expedition_stage', expeditionId = msg.expeditionId, stage = msg.stage, status = msg.status, playerName = playerName }, -1
+    end
+  end
+
+  if msg.type == 'expedition_complete' then
+    G.logistics.activeExpedition = nil
+    return { type = 'expedition_complete', expeditionId = msg.expeditionId, stamp = msg.stamp, playerName = playerName }, -1
+  end
+
+  return nil, nil
+end
+
 -- ---------------------------------------------------------------------------------------------------------------
 -- BeamMP wiring (absent in the offline tests)
 if MP and MP.RegisterEvent then
@@ -168,6 +272,7 @@ if MP and MP.RegisterEvent then
     end
     if p and not known then
       MP.TriggerClientEvent(pid, 'bngeConfig', encode(G.config()))
+      MP.TriggerClientEvent(pid, 'bngeLogistics', encode({ type = 'sync_state', state = G.logistics }))
       print(string.format('[BeamNG.Earth] %s at %.5f, %.5f (anchor %s)', tostring(p.name), p.lat, p.lon,
         G.key(p.aLat, p.aLon)))
     end
@@ -181,6 +286,17 @@ if MP and MP.RegisterEvent then
   end
 
   function BNGE_onLeave(pid) G.onLeave(pid) end
+
+  function BNGE_onLogistics(pid, data)
+    local ok, d = pcall(Util.JsonDecode, data)
+    if not ok or type(d) ~= 'table' then return end
+    local p = G.players[pid]
+    local pName = (p and p.name) or (MP.GetPlayerName and MP.GetPlayerName(pid)) or ('Player ' .. tostring(pid))
+    local reply, target = G.onLogistics(pid, d, pName)
+    if reply then
+      MP.TriggerClientEvent(target or -1, 'bngeLogistics', encode(reply))
+    end
+  end
 
   function BNGE_tick()
     MP.TriggerClientEvent(-1, 'bngeAnchors', encode(G.tick(G.TICK_MS / 1000)))
@@ -196,6 +312,7 @@ if MP and MP.RegisterEvent then
   end
 
   MP.RegisterEvent('bngePose', 'BNGE_onPose')
+  MP.RegisterEvent('bngeLogistics', 'BNGE_onLogistics')
   MP.RegisterEvent('onPlayerDisconnect', 'BNGE_onLeave')
   MP.RegisterEvent('BNGE_tick', 'BNGE_tick')
   MP.CreateEventTimer('BNGE_tick', G.TICK_MS)
