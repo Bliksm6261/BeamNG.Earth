@@ -676,6 +676,39 @@ function M.uiAfricanWeatherSetAuto(enabled)
   return { ok = true, auto = aw.setAutoWeather(enabled) }
 end
 
+-- Bush Camp & Rooftop Tent UI Bridge
+function M.uiBushCampDeploy()
+  local core = ext('beamngEarth_core')
+  local st = core and core._state and core._state() or nil
+  local pl = st and st.player
+  local pVeh = rawget(_G, 'getPlayerVehicle') and getPlayerVehicle(0)
+  local bushcamp = require('beamngEarth/bushcamp')
+  local ok, res = bushcamp.deployCamp(pl and pl.lat, pl and pl.lon, pVeh)
+  return { ok = ok, result = res }
+end
+
+function M.uiBushCampPack()
+  local pVeh = rawget(_G, 'getPlayerVehicle') and getPlayerVehicle(0)
+  local bushcamp = require('beamngEarth/bushcamp')
+  local ok, res = bushcamp.packCamp(pVeh)
+  return { ok = ok, result = res }
+end
+
+function M.uiBushCampRest(hours)
+  local bushcamp = require('beamngEarth/bushcamp')
+  local ok, res = bushcamp.restAtCamp(hours or 8)
+  return { ok = ok, result = res }
+end
+
+function M.uiBushCampState()
+  local core = ext('beamngEarth_core')
+  local st = core and core._state and core._state() or nil
+  local pl = st and st.player
+  local pVeh = rawget(_G, 'getPlayerVehicle') and getPlayerVehicle(0)
+  local bushcamp = require('beamngEarth/bushcamp')
+  return bushcamp.getUiState(pl and pl.lat, pl and pl.lon, pVeh)
+end
+
 -- Overlanding Expeditions & Home Base UI Bridge
 function M.uiExpeditionState()
   local core = ext('beamngEarth_core')

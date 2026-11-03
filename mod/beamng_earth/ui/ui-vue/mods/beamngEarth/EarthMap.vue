@@ -401,6 +401,52 @@
 
           <!-- TAB 2: OVERLANDING EXPEDITIONS -->
           <div v-else-if="hqTab === 'overland'" class="overland-tab-content">
+            <!-- Bush Camp & Rooftop Tent Field Ops Card -->
+            <div class="bush-camp-card" :class="{ 'camp-active': bushCampData.deployed }">
+              <div class="camp-top-row">
+                <div class="camp-title-group">
+                  <span class="camp-icon">🏕️</span>
+                  <div>
+                    <div class="camp-title">Bush Camp &amp; Rooftop Tent</div>
+                    <div class="camp-status-subtitle">
+                      {{ bushCampData.deployed ? '⛺ Camp Deployed: Rooftop Tent Open, Campfire Lit, 12V Floodlights On' : 'Pull off-road to pitch camp, stargaze, and recharge driver stamina' }}
+                    </div>
+                  </div>
+                </div>
+                <div v-if="bushCampData.hasBuff" class="buff-badge">
+                  ⭐ Well-Rested Explorer (+10% Bonus, {{ bushCampData.buffMinutesLeft }}m left)
+                </div>
+              </div>
+              <div class="camp-actions-row">
+                <button
+                  v-if="!bushCampData.deployed"
+                  class="map-btn small primary"
+                  :disabled="!bushCampData.canDeploy"
+                  :class="{ disabled: !bushCampData.canDeploy }"
+                  @click="deployBushCamp"
+                  title="Vehicle must be completely stopped off-road to pitch camp"
+                >
+                  🏕️ Pitch Camp &amp; Tent
+                </button>
+                <button
+                  v-if="bushCampData.deployed"
+                  class="map-btn small highlight"
+                  @click="restAtCamp(8)"
+                  title="Rest by campfire for 8 hours: resets fatigue to 0% and grants explorer buff"
+                >
+                  🌌 Rest by Campfire (8 Hours)
+                </button>
+                <button
+                  v-if="bushCampData.deployed"
+                  class="map-btn small"
+                  @click="packBushCamp"
+                  title="Pack up rooftop tent and extinguish campfire"
+                >
+                  ⛺ Pack Up Camp
+                </button>
+              </div>
+            </div>
+
             <!-- Active Expedition in Progress or Transit -->
             <div v-if="expData.activeTour" class="active-contract-card">
               <div class="active-header">
@@ -875,6 +921,7 @@ const freightData = ref({ company: null, activeContract: null, availableJobs: []
 const expData = ref({ homeBase: null, passport: {}, tours: [], activeTour: null, checkpointIndex: 1, currentCheckpoint: null, distanceToCheckpointM: null })
 const convoyData = ref({ currentChannel: 19, channels: [], presets: [], recentChatter: [], radarTargets: [], speedKmh: 0 })
 const cbCustomInput = ref("")
+const bushCampData = ref({ deployed: false, canDeploy: false, canPack: false, hasBuff: false, buffMinutesLeft: 0 })
 
 const editingGroupName = ref(false)
 const groupNameInput = ref("")
@@ -936,10 +983,39 @@ function setCbChannel(ch) {
   })
 }
 
+function pollBushCamp() {
+  engineLua("beamngEarth_settings and beamngEarth_settings.uiBushCampState and beamngEarth_settings.uiBushCampState() or nil", b => {
+    if (b) bushCampData.value = b
+  })
+}
+
+function deployBushCamp() {
+  engineLua("beamngEarth_settings.uiBushCampDeploy()", () => {
+    pollBushCamp()
+    pollExpeditions()
+  })
+}
+
+function packBushCamp() {
+  engineLua("beamngEarth_settings.uiBushCampPack()", () => {
+    pollBushCamp()
+    pollExpeditions()
+  })
+}
+
+function restAtCamp(hours) {
+  engineLua(`beamngEarth_settings.uiBushCampRest(${hours || 8})`, () => {
+    pollBushCamp()
+    pollFreight()
+    pollExpeditions()
+  })
+}
+
 function pollHq() {
   pollFreight()
   pollExpeditions()
   pollConvoy()
+  pollBushCamp()
 }
 
 function toggleHq() {
@@ -2496,4 +2572,23 @@ const fmtLatLon = mm.fmtLatLon
 .empty-radar, .empty-chatter {
   font-size: 11px; font-style: italic; color: #6b7785; text-align: center; padding: 20px 10px;
 }
+
+.bush-camp-card {
+  background: rgba(18, 24, 30, 0.9); border: 1px solid rgba(255, 149, 0, 0.35); border-radius: 6px;
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;
+}
+.bush-camp-card.camp-active {
+  border-color: rgba(40, 167, 69, 0.6); background: rgba(16, 28, 20, 0.85);
+  box-shadow: 0 0 15px rgba(40, 167, 69, 0.2);
+}
+.camp-top-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.camp-title-group { display: flex; align-items: center; gap: 10px; }
+.camp-icon { font-size: 24px; }
+.camp-title { font-size: 14px; font-weight: 700; color: #fff; }
+.camp-status-subtitle { font-size: 11px; color: #a0aab8; }
+.buff-badge {
+  background: rgba(255, 149, 0, 0.18); border: 1px solid rgba(255, 149, 0, 0.45);
+  color: #ffb54a; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px;
+}
+.camp-actions-row { display: flex; gap: 8px; }
 </style>
