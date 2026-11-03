@@ -6,6 +6,48 @@ What changed in each release of BeamNG.Earth, newest first.
 
 Works with BeamNG.drive 0.40.3.
 
+### Off the Beaten Track: Southern & Eastern Africa Simulation Expansion
+- **Dynamic African Weather, Bush Storms & Mud Physics (`african_weather.lua`):**
+  - Added authentic regional weather systems: Highveld supercell thunderstorms with heavy lightning, Kalahari haboobs (dust storms) with severe visibility drops, Drakensberg mountain escarpment mist, and Karoo heatwaves.
+  - Dynamic red clay tire friction physics: unpaved dirt trails and bush tracks dynamically lose traction during precipitation (~0.48 surface friction), making mud bogs and wet inclines realistic navigation challenges.
+  - Deterministic weather transitions synced with real-world time-of-day and geographic coordinates across the 10 supported countries.
+- **Overland Bush Camps, Rooftop Tents & Campfire Rest Buff (`bushcamp.lua`):**
+  - Added overland camp pitching: players can deploy rooftop tents and set up wilderness bush camps anywhere off-road (>35 m from paved corridors).
+  - Campfire rest mechanic: sitting by the fire advances game time by 8 hours to dawn or dusk, restoring driver stamina.
+  - "Well-Rested Bush Explorer" status buff: resting grants 45 minutes of real driving time with +10% delivery payouts, +15% overland reputation gain, and 20% fatigue resistance.
+  - Camp locations, active campfires, and tent states are synchronized across BeamMP players.
+- **Convoy Vehicle Recovery, Field Repairs & SOS Broadcast (`recovery.lua`):**
+  - Kinetic snatch-strap recovery: nearby convoy members (<25 m) can connect snatch straps to apply progressive kinetic tow impulses to haul stuck vehicles out of mud, sand dunes, or ditches.
+  - Trailside field repairs: reinflate punctured tires on unpaved trails and reset chassis/suspension geometry with the High-Lift jack tool.
+  - Channel 9 Emergency 10-33 SOS broadcast: players in distress can fire an emergency beacon that alerts all drivers within 50 km on their CB radio and convoy radar HUD.
+- **Corridor AI Traffic & African Wildlife Hazard Zones (`corridor_traffic.lua`):**
+  - Regional freight corridor traffic: long-distance b-double interlink trucks and Toyota Quantum commuter minibus taxis now populate primary transit routes (N1, N3, Trans-Kalahari Highway).
+  - Wildlife crossing hazard zones: active game migration and livestock corridors across Kruger National Park, Chobe National Park, Serengeti plains, and the Karoo with dynamic speed limits, animal crossing signs, and random animal path crossings.
+- **Virtual Trucking Company (VTC) Fleet Upgrades & Workshop Perks (`fleet_upgrades.lua`):**
+  - Company progression system: level up from Small Operator to Regional Carrier, Logistics Fleet, and Trans-Africa Enterprise.
+  - Commercial endorsements: obtain specialized carrier licenses for Hazardous Materials (HazMat), Heavy Haul / Abnormal Loads, Refrigerated Goods (Reefer), and SADC Cross-Border Carnet.
+  - Workshop perks: company-owned maintenance bays provide up to 40% discount on vehicle servicing, chassis repairs, and spare parts.
+- **Precision Reverse Docking Bonus (`reverse_docking.lua`):**
+  - Realistic loading bay reverse docking at regional warehouses, mines, and freight depots.
+  - +20% gross freight contract bonus awarded when blind-side reversing trailers into designated loading bays and uncoupling within 40 m without collision penalties.
+- **Fuel Consumption, Bulk Storage & Driver Fatigue (`fuel_fatigue.lua`):**
+  - Real-world diesel fuel consumption model calibrated for heavy haulers (~38 L/100 km).
+  - Refueling network: service stations, roadside truck stops, and company Home Base bulk fuel tanks offering 40% wholesale diesel discounts.
+  - Driver fatigue simulation: mandatory rest requirements at motels, truck stops, or bush camps to avoid driver drowsiness, tunnel vision, and control sluggishness.
+- **Toll Plazas, SADC Customs & Commercial Weighbridges (`checkpoints.lua`):**
+  - Regional checkpoint simulation covering N1/N3 toll plazas (Mooi River, Tugela, Capricorn), international border posts (Beitbridge, Lebombo), and commercial weighbridges (Heidelberg).
+  - Automated toll collection and customs duty processing with 100% duty exemptions for certified SADC Cross-Border Carnet holders.
+  - 34-ton gross mass enforcement with weighbridge axle scale checks and Heavy Haul oversize permit waivers.
+- **In-Game CB Radio & Convoy Radar HUD (`cb_radio.lua`):**
+  - Three dedicated communications channels: Channel 19 Highway (general comms & hazard warnings), Channel 1 Convoy (local group coordination), and Channel 9 Emergency (distress & roadside assistance).
+  - Tactical quick-callout wheel ("10-4 Affirmative", "10-33 Emergency", "Broken Down", "Weighbridge Open", "Road Blocked").
+  - `BeamNGEarthConvoy` HUD app: 15 km tactical radar displaying nearby convoy members, distances, relative bearings, and SOS distress beacons.
+- **BeamMP Server Synchronization & Event Replication (`Resources/Server/BeamNGEarth/main.lua`):**
+  - Added dedicated network event handlers for `bnge:fuel_refuel`, `bnge:checkpoint_clear`, `bnge:cb_radio_msg`, `bnge:recovery_tow_req`, and `bnge:bushcamp_state`.
+  - Full convoy event replication between all connected players on the live server (`beamng.offthebeatentrack.world:30814`).
+- **Standalone Player Packaging & Auto-Join Integration (`tools/package.py`, `beammp_launch.py`):**
+  - One-click standalone executable (`OffTheBeatenTrack-1.6.1-beta.exe`) that installs mod files, manages the BeamMP client launcher, and automatically connects to the official community server.
+
 ### Smoother driving
 - **Reduced the chance of hitches on Windows when the ground moves with you.** Each time the ground under the car moved
   to its next piece, Windows rebuilt the ground's textures a second time. In testing on a Steam Deck, that frame got

@@ -87,6 +87,34 @@ the mod, report problems, and get an IP to join a BeamMP.Earth server (see [Mult
   vehicle menu work on it.
 - **Traffic**: stock BeamNG traffic and police can be switched on, and parked cars line the streets and fill
   parking lots (stock BeamNG parking).
+- **Corridor traffic & wildlife hazards**: regional corridor traffic simulates freight corridors with b-double
+  interlink trucks and Quantum minibus taxis, alongside wildlife and livestock crossing hazard zones across Kruger,
+  Chobe, Serengeti, and the Karoo with dynamic speed restrictions.
+
+**Off the Beaten Track Simulation & Logistics**
+- **Overland bush camps & rooftop tents**: deploy rooftop tents and pitch camp anywhere off-road in the African
+  bush. Gather around campfires to rest, advancing the clock 8 hours and earning the "Well-Rested Bush Explorer"
+  buff (+10% delivery payout, +15% overland reputation, +20% fatigue resistance).
+- **Severe African weather & mud physics**: experience regional weather events including Highveld supercell
+  thunderstorms, Kalahari haboobs (dust storms), Drakensberg mountain mist, and Karoo heatwaves. Wet dirt and unpaved
+  tracks dynamically transform into slick red clay mud with authentic tire friction reduction (~0.48 friction coefficient).
+- **Convoy vehicle recovery & field repairs**: carry snatch straps for kinetic snatch-tow impulses between convoy
+  members, reinflate punctured tires on the trail, align suspension with High-Lift jacks, and broadcast emergency
+  "10-33" distress beacons across the network.
+- **In-Game CB Radio & Convoy Radar HUD**: multi-channel CB radio system with dedicated channels (Channel 19 Highway,
+  Channel 1 Convoy, Channel 9 Emergency) and tactical callouts ("10-4", "10-33 Emergency", "Broken Down", "Weighbridge Open"),
+  paired with a live 15 km Convoy Radar HUD app displaying nearby players, ranges, headings, and distress alerts.
+- **Virtual Trucking Company (VTC) fleet upgrades**: earn company rank, upgrade terminal dispatch bays, purchase
+  commercial licenses (HazMat, Heavy Haul / Abnormal Loads, Refrigerated Goods, SADC Cross-Border Carnet), and unlock
+  workshop maintenance discounts.
+- **Precision reverse docking**: earn an extra +20% gross payout bonus on freight contracts by manually blind-side
+  reversing and uncoupling trailers inside designated warehouse loading bays (<40 m).
+- **Fuel stations & driver fatigue**: realistic diesel consumption simulation (~38 L/100 km for heavy haulers) with
+  fuel stops at regional filling stations and Home Base bulk fuel tanks offering 40% discounts. Drivers must rest at
+  motels, rest stops, or bush camps to manage fatigue penalties.
+- **Highway toll plazas, SADC border posts & weighbridges**: realistic checkpoints across Southern Africa, including
+  N1/N3 toll plazas (Mooi River, Tugela, Capricorn), international border posts (Beitbridge, Lebombo) with customs
+  duty waivers for SADC Carnet holders, and commercial weighbridges (Heidelberg) enforcing 34-ton gross mass limits.
 
 **Multiplayer (BeamMP, in testing)**
 - Play the real world together on a BeamMP server (every player runs the BeamNG.Earth app): players who join are
@@ -221,6 +249,13 @@ BeamNG.Earth runs on [BeamMP](https://beammp.com/) servers (in testing): drive t
 
 You are sent to where the others are. Cars show in the right place, with their dents, in everyone's world; other
 players show on the world map (**M**) as green arrows; players far away (another country) are hidden until you meet.
+
+**Off the Beaten Track official server:** the packaged app automatically connects to `beamng.offthebeatentrack.world:30814`
+on launch. In addition to vehicle positioning, the server replicates convoy simulation events in real time:
+- In-game CB Radio messages and emergency alerts on Channels 1, 19, and 9;
+- Convoy snatch-strap kinetic towing impulses and roadside recovery requests;
+- Overland bush camps and rooftop tent deployments with campfire rest buffs;
+- Checkpoint clearance across toll plazas, weighbridges, and border posts.
 
 **Sharing the work:** players near each other share one world origin and split the building of the distant
 landscape (each piece is built once and sent to the others; faster computers take more), while a player far from

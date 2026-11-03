@@ -40,6 +40,23 @@ key-only logins with Tailscale SSH off, UFW, fail2ban, automatic updates; the ga
 To update, unzip the new version's server zip over the old one and restart the server. The server needs no world
 data and little CPU: the world is built on each player's computer.
 
+## Network Event Replication
+
+The BeamNG.Earth server plugin (`Resources/Server/BeamNGEarth/main.lua`) replicates convoy and logistics simulation events between all connected players:
+- **`bnge:cb_radio_msg`**: Replicates CB radio chat, tactical 10-codes, and emergency 10-33 SOS alerts across channels (19 Highway, 1 Convoy, 9 Emergency).
+- **`bnge:recovery_tow_req`**: Coordinates kinetic snatch-strap towing impulses between convoy members within 25 meters.
+- **`bnge:bushcamp_state`**: Synchronizes deployable rooftop tents, campfire positions, and player rest states in the wilderness.
+- **`bnge:checkpoint_clear`**: Broadcasts toll booth, customs clearance, and weighbridge compliance status.
+- **`bnge:fuel_refuel`**: Tracks shared commercial fueling events and Home Base bulk fuel operations.
+
+## Live Production Server (OTBT)
+
+The official Off the Beaten Track server is deployed at:
+- **Host:** `beamng.offthebeatentrack.world` (IP: `156.155.250.124`)
+- **Port:** `30814` (TCP & UDP)
+- **Mod:** `Resources/Client/beamng_earth.zip` (automatically synced to clients on connection)
+- **Service Management:** `sudo systemctl status beammp` (deployed in `/opt/beammp` via `/opt/beammp-src/beammp/setup_otbt_server.sh`)
+
 ## Players
 
 - **Every player needs the BeamNG.Earth app** (https://github.com/Bliksm6261/BeamNG.Earth/releases) running, the same

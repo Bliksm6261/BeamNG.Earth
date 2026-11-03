@@ -60,6 +60,37 @@ level's start options (Disabled / Parked only / Normal / Police), or turn them o
 driving with the game's **radial menu** (the traffic entry). The amounts are the game's own traffic
 settings (Options > Gameplay > Traffic).
 
+## Off the Beaten Track: Gameplay & Features Guide
+
+### 1. In-Game CB Radio & Convoy Radar
+- **CB Radio (`Ctrl+Shift+C` or UI App):** Switch between three dedicated channels:
+  - **Channel 19 (Highway):** General road chatter, traffic reports, and weighbridge alerts.
+  - **Channel 1 (Convoy):** Private convoy comms for travel groups and squad routing.
+  - **Channel 9 (Emergency):** Distress channel for breakdowns, mud-bogged rigs, and SOS beacons.
+- **Convoy Radar (`BeamNGEarthConvoy` HUD App):** Displays a 15 km tactical radar with bearing arrows, player distance tags, and flashing red SOS beacons.
+
+### 2. Overland Bush Camps & Rooftop Tents
+- **Pitching Camp (`Ctrl+Shift+B`):** Pull off the road (>35 m away from paved asphalt) and stop your vehicle. Deploy your rooftop tent or pitch an overland bush camp with a campfire.
+- **Campfire Rest:** Resting advances the game clock by 8 hours to dawn or dusk, clearing all driver fatigue.
+- **Well-Rested Bush Explorer Buff:** Grants 45 minutes of real driving time with +10% delivery payouts, +15% overland reputation gains, and 20% fatigue resistance.
+
+### 3. Trailside Vehicle Recovery & Field Repairs
+- **Snatch Strap Towing (`Ctrl+Shift+R`):** When stuck in mud, sand dunes, or steep ravines, pull a convoy partner within 25 m and connect a kinetic snatch strap. The tow vehicle pulls forward to generate a kinetic momentum surge pulling the stuck vehicle free.
+- **Field Repairs:** Reinflate punctured off-road tires and align bent suspension linkages with the High-Lift jack.
+- **Emergency Beacon:** If completely immobilized, fire a Channel 9 10-33 distress signal to notify all players within 50 km on the radar.
+
+### 4. Logistics, VTC Upgrades & Precision Docking
+- **VTC Fleet Upgrades:** Access your company status via the Logistics map tab (**M**). Level up company rank, expand dispatch bays, and acquire commercial endorsements:
+  - **HazMat:** High-risk chemical and petroleum transport.
+  - **Heavy Haul:** Oversized and abnormal loads with weighbridge permit exemptions.
+  - **Reefer:** Temperature-controlled perishable cargo across long distances.
+  - **SADC Cross-Border Carnet:** Expedited customs clearance and 100% duty waivers at Beitbridge and Lebombo border posts.
+- **Precision Reverse Docking:** Back your semi-trailer cleanly into warehouse loading bays and uncouple within 40 m to earn a **+20% gross freight payout bonus**.
+
+### 5. Fuel & Fatigue Management
+- **Fuel Stations & Bulk Tanks:** Keep track of diesel consumption (~38 L/100 km under heavy load). Refuel at highway service plazas or return to your Home Base bulk depot for a **40% wholesale fuel discount**.
+- **Driver Fatigue:** Extended driving without sleep induces driver fatigue, resulting in control sluggishness and blurred vision. Rest at motels, roadside stops, or off-road bush camps to keep driver stamina optimal.
+
 ## Something wrong? Tell us
 In the game, press **Ctrl+Shift+E** where it happens: the mod takes a screenshot and notes the place,
 the frame rate and your hardware and graphics settings. Pick the kind (**Map issue**, **Performance
