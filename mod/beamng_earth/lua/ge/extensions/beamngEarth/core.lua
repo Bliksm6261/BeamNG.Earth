@@ -66,6 +66,7 @@ local gps = require('beamngEarth/gps')               -- the game's GPS route to 
 local freight = require('beamngEarth/freight')       -- freight market, multi-truck co-op hauls and damage
 local expeditions = require('beamngEarth/expeditions') -- overlanding tours, 4x4 trails and Home Base
 local convoy = require('beamngEarth/convoy')           -- CB radio and convoy radar app
+local african_weather = require('beamngEarth/african_weather') -- African weather & mud physics
 local collisionfoci = require('beamngEarth/collisionfoci') -- other vehicles' collision islands
 local terrainpatch = require('beamngEarth/terrainpatch')   -- ground under the islands off the terrain block
 local farcars = require('beamngEarth/farcars')             -- far player cars saved, taken out and put back
@@ -1632,6 +1633,7 @@ local function onUpdate(dtReal, dtSim)
   if st.inOurLevel then gps.update(st.anchor, st.player) end
   if st.inOurLevel then freight.update(st.player and st.player.lat, st.player and st.player.lon, getPlayerVehicle(0)) end
   if st.inOurLevel then expeditions.update(st.player and st.player.lat, st.player and st.player.lon) end
+  if st.inOurLevel then african_weather.update(st.player and st.player.lat, st.player and st.player.lon, getPlayerVehicle(0)) end
   seasonlook.update(st.inOurLevel, st.anchor and st.anchor.lat)
   t = mark('ui', t)
   local frameMs = frameMs0
@@ -1866,6 +1868,7 @@ local function onClientEndMission()
   pcall(freight.reset)
   pcall(expeditions.reset)
   pcall(convoy.reset)
+  pcall(african_weather.reset)
   do local stg = rawget(_G, 'beamngEarth_settings') if stg and stg.redirectBigMap then stg.redirectBigMap(false) end end
   seasonlook.restore()
   -- runs before the level deletes its objects (server/server.lua:19 vs :34): delete the far tiles

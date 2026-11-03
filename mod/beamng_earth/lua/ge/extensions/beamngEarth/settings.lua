@@ -659,6 +659,23 @@ function M.uiCbSetChannel(channel)
   return { ok = ok, channel = res }
 end
 
+-- African Weather & Mud Physics UI Bridge
+function M.uiAfricanWeatherState()
+  local aw = require('beamngEarth/african_weather')
+  return aw.getUiState()
+end
+
+function M.uiAfricanWeatherApply(presetId)
+  local aw = require('beamngEarth/african_weather')
+  local ok, res = aw.applyPreset(presetId)
+  return { ok = ok, preset = res }
+end
+
+function M.uiAfricanWeatherSetAuto(enabled)
+  local aw = require('beamngEarth/african_weather')
+  return { ok = true, auto = aw.setAutoWeather(enabled) }
+end
+
 -- Overlanding Expeditions & Home Base UI Bridge
 function M.uiExpeditionState()
   local core = ext('beamngEarth_core')
