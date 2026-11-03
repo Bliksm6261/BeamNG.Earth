@@ -68,6 +68,7 @@ local expeditions = require('beamngEarth/expeditions') -- overlanding tours, 4x4
 local convoy = require('beamngEarth/convoy')           -- CB radio and convoy radar app
 local african_weather = require('beamngEarth/african_weather') -- African weather & mud physics
 local bushcamp = require('beamngEarth/bushcamp')       -- overland bush camp & rooftop tent
+local recovery = require('beamngEarth/recovery')       -- vehicle winch recovery & field repair
 local collisionfoci = require('beamngEarth/collisionfoci') -- other vehicles' collision islands
 local terrainpatch = require('beamngEarth/terrainpatch')   -- ground under the islands off the terrain block
 local farcars = require('beamngEarth/farcars')             -- far player cars saved, taken out and put back
@@ -1871,6 +1872,7 @@ local function onClientEndMission()
   pcall(convoy.reset)
   pcall(african_weather.reset)
   pcall(bushcamp.reset)
+  pcall(recovery.reset)
   do local stg = rawget(_G, 'beamngEarth_settings') if stg and stg.redirectBigMap then stg.redirectBigMap(false) end end
   seasonlook.restore()
   -- runs before the level deletes its objects (server/server.lua:19 vs :34): delete the far tiles

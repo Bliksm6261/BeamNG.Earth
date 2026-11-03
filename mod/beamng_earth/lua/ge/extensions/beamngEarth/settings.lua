@@ -709,6 +709,50 @@ function M.uiBushCampState()
   return bushcamp.getUiState(pl and pl.lat, pl and pl.lon, pVeh)
 end
 
+-- Recovery & Winch Operations UI Bridge
+function M.uiRecoveryRepairTires()
+  local pVeh = rawget(_G, 'getPlayerVehicle') and getPlayerVehicle(0)
+  local recovery = require('beamngEarth/recovery')
+  local ok, res = recovery.repairTires(pVeh)
+  return { ok = ok, result = res }
+end
+
+function M.uiRecoverySnatchStrap()
+  local core = ext('beamngEarth_core')
+  local st = core and core._state and core._state() or nil
+  local pl = st and st.player
+  local pVeh = rawget(_G, 'getPlayerVehicle') and getPlayerVehicle(0)
+  local recovery = require('beamngEarth/recovery')
+  local ok, res = recovery.connectSnatchStrap(pl and pl.lat, pl and pl.lon, pVeh)
+  return { ok = ok, result = res }
+end
+
+function M.uiRecoveryEmergencySos()
+  local core = ext('beamngEarth_core')
+  local st = core and core._state and core._state() or nil
+  local pl = st and st.player
+  local pVeh = rawget(_G, 'getPlayerVehicle') and getPlayerVehicle(0)
+  local recovery = require('beamngEarth/recovery')
+  local ok, res = recovery.sendEmergencySos(pl and pl.lat, pl and pl.lon, pVeh)
+  return { ok = ok, result = res }
+end
+
+function M.uiRecoveryHighLiftJack()
+  local pVeh = rawget(_G, 'getPlayerVehicle') and getPlayerVehicle(0)
+  local recovery = require('beamngEarth/recovery')
+  local ok, res = recovery.realignSuspension(pVeh)
+  return { ok = ok, result = res }
+end
+
+function M.uiRecoveryState()
+  local core = ext('beamngEarth_core')
+  local st = core and core._state and core._state() or nil
+  local pl = st and st.player
+  local pVeh = rawget(_G, 'getPlayerVehicle') and getPlayerVehicle(0)
+  local recovery = require('beamngEarth/recovery')
+  return recovery.getUiState(pl and pl.lat, pl and pl.lon, pVeh)
+end
+
 -- Overlanding Expeditions & Home Base UI Bridge
 function M.uiExpeditionState()
   local core = ext('beamngEarth_core')
