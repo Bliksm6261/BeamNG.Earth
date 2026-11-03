@@ -10,7 +10,7 @@
 -- Pure apart from guihooks (runs under plain luajit with a stub).
 local M = {}
 
-M.NAMES = { status = true, credits = true, banner = true, freight = true }
+M.NAMES = { status = true, credits = true, banner = true, freight = true, convoy = true }
 M.SEND_S = 0.25           -- s between updates to the apps (the status bar's fps changes every frame)
 M.STALE_S = 5.0           -- an unchanged payload is sent again this often (an app opened since)
 
@@ -44,6 +44,7 @@ function M.payload(t)
     bannerLevel = b.level or 'info',
     hidden = t.hidden and true or false,
     freight = t.freight or nil,
+    convoy = t.convoy or nil,
   }
 end
 

@@ -279,6 +279,9 @@
           <button class="hq-tab-btn" :class="{ active: hqTab === 'upgrades' }" @click="hqTab = 'upgrades'">
             🛠️ Fleet &amp; Upgrades
           </button>
+          <button class="hq-tab-btn" :class="{ active: hqTab === 'convoy' }" @click="hqTab = 'convoy'">
+            📻 CB Radio &amp; Convoy
+          </button>
         </div>
 
         <div class="freight-body">
@@ -704,6 +707,127 @@
               </div>
             </div>
           </div>
+
+          <!-- TAB 5: CB RADIO & CONVOY RADAR -->
+          <div v-else-if="hqTab === 'convoy'" class="convoy-tab-content">
+            <!-- Radio Transceiver Bar -->
+            <div class="convoy-radio-card">
+              <div class="radio-card-top">
+                <div class="radio-channel-selector">
+                  <span class="radio-label">📻 Transceiver Channel:</span>
+                  <div class="channel-buttons">
+                    <button
+                      v-for="ch in (convoyData.channels || [])"
+                      :key="ch.id"
+                      class="channel-btn"
+                      :class="{ active: convoyData.currentChannel === ch.id, emergency: ch.id === 9 }"
+                      @click="setCbChannel(ch.id)"
+                      :title="ch.label"
+                    >
+                      CH {{ ch.id }} &middot; {{ ch.name }}
+                    </button>
+                  </div>
+                </div>
+                <div class="convoy-speed-badge">
+                  <span>Convoy Pace:</span>
+                  <strong>{{ convoyData.speedKmh }} km/h</strong>
+                </div>
+              </div>
+
+              <!-- Quick Callouts Grid -->
+              <div class="presets-section">
+                <span class="presets-label">🎙️ Quick CB Callouts (Click to Broadcast):</span>
+                <div class="presets-grid">
+                  <button
+                    v-for="p in (convoyData.presets || [])"
+                    :key="p.code"
+                    class="preset-btn"
+                    :class="{ alert: p.code === 'breakdown' || p.code === 'hazard' || p.code === 'smokey' }"
+                    @click="sendCbPreset(p)"
+                    :title="p.text"
+                  >
+                    {{ p.label }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Custom Transmission Input -->
+              <div class="custom-tx-row">
+                <input
+                  v-model="cbCustomInput"
+                  type="text"
+                  class="custom-tx-input"
+                  placeholder="Type custom CB radio transmission... (Enter to broadcast)"
+                  maxlength="100"
+                  @keyup.enter="sendCbCustom"
+                />
+                <button class="map-btn primary small tx-btn" @click="sendCbCustom">
+                  🎙️ Transmit
+                </button>
+              </div>
+            </div>
+
+            <!-- Two-Column Display: Radar & Chatter -->
+            <div class="convoy-columns-grid">
+              <!-- Column 1: Convoy Radar -->
+              <div class="convoy-col">
+                <div class="col-header">
+                  <span class="col-title">📡 Tactical Convoy Radar</span>
+                  <span class="col-count">{{ (convoyData.radarTargets || []).length }} Active Targets</span>
+                </div>
+                <div class="radar-targets-list">
+                  <div
+                    v-for="t in (convoyData.radarTargets || [])"
+                    :key="t.id"
+                    class="radar-target-card"
+                  >
+                    <div class="target-top">
+                      <span class="target-name">
+                        {{ t.type === 'truck' ? '🚚' : '🚙' }} {{ t.name }}
+                      </span>
+                      <span class="target-health-badge" :style="{ color: t.cargoHealth > 80 ? '#28a745' : '#dc3545' }">
+                        {{ t.cargoHealth }}% Health
+                      </span>
+                    </div>
+                    <div class="target-bottom">
+                      <span class="target-dist">📍 {{ t.distanceM }}m</span>
+                      <span class="target-clock">🧭 {{ t.clockDirection }}</span>
+                      <span class="target-speed">⚡ {{ t.speedKmh }} km/h</span>
+                    </div>
+                  </div>
+                  <div v-if="!convoyData.radarTargets || convoyData.radarTargets.length === 0" class="empty-radar">
+                    Radar scanning 360°... No convoy peers detected in range.
+                  </div>
+                </div>
+              </div>
+
+              <!-- Column 2: CB Radio Chatter Log -->
+              <div class="convoy-col">
+                <div class="col-header">
+                  <span class="col-title">💬 Live CB Radio Log</span>
+                  <span class="col-count">CH {{ convoyData.currentChannel }}</span>
+                </div>
+                <div class="chatter-log-list">
+                  <div
+                    v-for="(msg, idx) in (convoyData.recentChatter || [])"
+                    :key="idx"
+                    class="chatter-msg-row"
+                    :class="{ 'self-msg': msg.isSelf, 'emergency-msg': msg.channel === 9 }"
+                  >
+                    <div class="msg-meta">
+                      <span class="msg-ch-tag">CH {{ msg.channel }}</span>
+                      <strong class="msg-sender">{{ msg.callsign }}</strong>
+                      <span class="msg-time">{{ new Date(msg.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</span>
+                    </div>
+                    <div class="msg-text">{{ msg.message }}</div>
+                  </div>
+                  <div v-if="!convoyData.recentChatter || convoyData.recentChatter.length === 0" class="empty-chatter">
+                    CB radio frequency open. Transmit a preset callout to start chatter.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -749,6 +873,8 @@ const hqOpen = ref(false)
 const hqTab = ref('base')
 const freightData = ref({ company: null, activeContract: null, availableJobs: [], canDeliver: false })
 const expData = ref({ homeBase: null, passport: {}, tours: [], activeTour: null, checkpointIndex: 1, currentCheckpoint: null, distanceToCheckpointM: null })
+const convoyData = ref({ currentChannel: 19, channels: [], presets: [], recentChatter: [], radarTargets: [], speedKmh: 0 })
+const cbCustomInput = ref("")
 
 const editingGroupName = ref(false)
 const groupNameInput = ref("")
@@ -782,9 +908,38 @@ function pollExpeditions() {
   })
 }
 
+function pollConvoy() {
+  engineLua("beamngEarth_settings and beamngEarth_settings.uiConvoyState and beamngEarth_settings.uiConvoyState() or nil", c => {
+    if (c) convoyData.value = c
+  })
+}
+
+function sendCbPreset(preset) {
+  if (!preset) return
+  engineLua(`beamngEarth_settings.uiCbTransmit(${convoyData.value.currentChannel}, ${luaStr(preset.text)}, nil, ${luaStr(preset.code)})`, () => {
+    pollConvoy()
+  })
+}
+
+function sendCbCustom() {
+  const text = cbCustomInput.value.trim()
+  if (!text) return
+  engineLua(`beamngEarth_settings.uiCbTransmit(${convoyData.value.currentChannel}, ${luaStr(text)}, nil, "custom")`, () => {
+    cbCustomInput.value = ""
+    pollConvoy()
+  })
+}
+
+function setCbChannel(ch) {
+  engineLua(`beamngEarth_settings.uiCbSetChannel(${ch})`, () => {
+    pollConvoy()
+  })
+}
+
 function pollHq() {
   pollFreight()
   pollExpeditions()
+  pollConvoy()
 }
 
 function toggleHq() {
@@ -2264,4 +2419,81 @@ const fmtLatLon = mm.fmtLatLon
 .cp-name { font-size: 14px; font-weight: 700; color: #fff; }
 .cp-dist-tag { font-size: 11px; font-weight: 600; color: #ffb54a; background: rgba(255, 149, 0, 0.15); padding: 1px 6px; border-radius: 3px; }
 .cp-desc { font-size: 12px; color: #a0aab8; }
+
+.convoy-tab-content { display: flex; flex-direction: column; gap: 14px; }
+.convoy-radio-card {
+  background: rgba(16, 20, 28, 0.95); border: 1px solid rgba(0, 255, 170, 0.3); border-radius: 6px;
+  padding: 14px; display: flex; flex-direction: column; gap: 12px;
+}
+.radio-card-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+.radio-channel-selector { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.radio-label { font-size: 12px; font-weight: 700; color: #fff; }
+.channel-buttons { display: flex; gap: 6px; }
+.channel-btn {
+  background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 4px;
+  color: #c0c8d4; font-size: 11px; font-weight: 600; padding: 4px 10px; cursor: pointer; transition: all 0.15s ease;
+}
+.channel-btn:hover { border-color: #00ffaa; color: #fff; }
+.channel-btn.active { background: #00c07f; border-color: #00ffaa; color: #111; font-weight: 700; }
+.channel-btn.emergency.active { background: #dc3545; border-color: #ff4d5e; color: #fff; }
+.convoy-speed-badge { font-size: 12px; color: #a0aab8; display: flex; gap: 6px; align-items: center; }
+.convoy-speed-badge strong { color: #00ffaa; font-size: 14px; }
+
+.presets-section { display: flex; flex-direction: column; gap: 6px; }
+.presets-label { font-size: 11px; font-weight: 600; color: #9aa4ae; text-transform: uppercase; letter-spacing: 0.05em; }
+.presets-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.preset-btn {
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px;
+  color: #eef1f4; font-size: 11px; font-weight: 600; padding: 6px 8px; cursor: pointer; text-align: center;
+  transition: all 0.15s ease; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.preset-btn:hover { background: rgba(0, 255, 170, 0.15); border-color: #00ffaa; color: #fff; }
+.preset-btn.alert { border-color: rgba(220, 53, 69, 0.4); }
+.preset-btn.alert:hover { background: rgba(220, 53, 69, 0.25); border-color: #dc3545; }
+
+.custom-tx-row { display: flex; gap: 8px; }
+.custom-tx-input {
+  flex-grow: 1; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px; padding: 6px 12px; color: #fff; font-size: 12px;
+}
+.custom-tx-input:focus { border-color: #00ffaa; outline: none; }
+.tx-btn { white-space: nowrap; }
+
+.convoy-columns-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.convoy-col {
+  background: rgba(16, 20, 28, 0.85); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px;
+  padding: 12px; display: flex; flex-direction: column; gap: 8px; min-height: 200px;
+}
+.col-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 6px; }
+.col-title { font-size: 12px; font-weight: 700; color: #fff; }
+.col-count { font-size: 11px; font-weight: 600; color: #00ffaa; }
+
+.radar-targets-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+.radar-target-card {
+  background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 4px;
+  padding: 8px 10px; display: flex; flex-direction: column; gap: 4px;
+}
+.target-top { display: flex; justify-content: space-between; align-items: center; }
+.target-name { font-size: 12px; font-weight: 700; color: #fff; }
+.target-health-badge { font-size: 10px; font-weight: 700; }
+.target-bottom { display: flex; gap: 10px; font-size: 11px; color: #a0aab8; }
+.target-dist { color: #ffb54a; font-weight: 600; }
+.target-clock { color: #8fe0ba; }
+
+.chatter-log-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+.chatter-msg-row {
+  background: rgba(0, 0, 0, 0.35); border-left: 3px solid #00c07f; border-radius: 3px;
+  padding: 6px 8px; display: flex; flex-direction: column; gap: 2px;
+}
+.chatter-msg-row.self-msg { border-left-color: #ff9500; }
+.chatter-msg-row.emergency-msg { border-left-color: #dc3545; background: rgba(220, 53, 69, 0.1); }
+.msg-meta { display: flex; align-items: center; gap: 6px; font-size: 10px; color: #8892a0; }
+.msg-ch-tag { background: rgba(255, 255, 255, 0.1); padding: 1px 4px; border-radius: 2px; font-weight: 700; color: #eef1f4; }
+.msg-sender { color: #fff; font-size: 11px; }
+.msg-time { margin-left: auto; }
+.msg-text { font-size: 12px; color: #d0d7de; line-height: 1.3; }
+
+.empty-radar, .empty-chatter {
+  font-size: 11px; font-style: italic; color: #6b7785; text-align: center; padding: 20px 10px;
+}
 </style>

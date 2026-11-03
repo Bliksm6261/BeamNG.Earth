@@ -139,6 +139,22 @@ do
   T.check(rep and rep.type == 'purchase_upgrade' and target == -1, 'purchase_upgrade broadcast')
   T.check(G.logistics.company.upgrades['license_hazmat'] ~= nil, 'server stored upgrade')
   T.check(G.logistics.company.vault == 45000, 'server vault deducted for upgrade')
+
+  -- 10. refuel
+  rep, target = G.onLogistics(1, { type = 'refuel', cost = 500 }, 'Alpha')
+  T.check(rep and rep.type == 'refuel' and target == -1, 'refuel broadcast to convoy')
+  T.check(G.logistics.company.vault == 44500, 'server deducted refuel cost from vault')
+
+  -- 11. checkpoint_clear
+  rep, target = G.onLogistics(1, { type = 'checkpoint_clear', checkpointId = 'toll_mooi_river', fee = 38, fine = 0, name = 'Mooi River Toll' }, 'Alpha')
+  T.check(rep and rep.type == 'checkpoint_clear' and target == -1, 'checkpoint_clear broadcast to convoy')
+  T.check(G.logistics.company.vault == 44500 - 38, 'server deducted toll fee from vault')
+
+  -- 12. cb_radio
+  rep, target = G.onLogistics(1, { type = 'cb_radio', channel = 19, callsign = 'Alpha Lead', message = '10-4, rolling out', code = '10-4' }, 'Alpha')
+  T.check(rep and rep.type == 'cb_radio' and target == -1, 'cb_radio broadcast across server')
+  T.check(rep.channel == 19, 'cb_radio channel preserved')
+  T.check(rep.message == '10-4, rolling out', 'cb_radio message delivered')
 end
 
 T.done('test_beammp_plugin')

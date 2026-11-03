@@ -273,6 +273,19 @@ function G.onLogistics(pid, msg, playerName)
     }, -1
   end
 
+  if msg.type == 'cb_radio' then
+    return {
+      type = 'cb_radio',
+      channel = tonumber(msg.channel) or 19,
+      callsign = tostring(msg.callsign or playerName),
+      message = tostring(msg.message or ''),
+      code = tostring(msg.code or ''),
+      time = os.time(),
+      playerName = playerName,
+      pid = pid
+    }, -1
+  end
+
   if msg.type == 'abandon' then
     G.logistics.activeContract = nil
     return { type = 'abandon', jobId = msg.jobId, playerName = playerName }, -1

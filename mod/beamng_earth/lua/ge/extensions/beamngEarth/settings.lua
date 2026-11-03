@@ -637,6 +637,28 @@ function M.uiCheckpointState()
   return checkpoints.getUiState(pl and pl.lat, pl and pl.lon)
 end
 
+-- CB Radio & Convoy Radar UI Bridge
+function M.uiConvoyState()
+  local core = ext('beamngEarth_core')
+  local st = core and core._state and core._state() or nil
+  local pl = st and st.player
+  local pVeh = rawget(_G, 'getPlayerVehicle') and getPlayerVehicle(0)
+  local convoy = require('beamngEarth/convoy')
+  return convoy.getUiState(pl and pl.lat, pl and pl.lon, pVeh)
+end
+
+function M.uiCbTransmit(channel, message, callsign, code)
+  local convoy = require('beamngEarth/convoy')
+  local ok, res = convoy.transmit(channel, message, callsign, code)
+  return { ok = ok, result = res }
+end
+
+function M.uiCbSetChannel(channel)
+  local convoy = require('beamngEarth/convoy')
+  local ok, res = convoy.setChannel(channel)
+  return { ok = ok, channel = res }
+end
+
 -- Overlanding Expeditions & Home Base UI Bridge
 function M.uiExpeditionState()
   local core = ext('beamngEarth_core')

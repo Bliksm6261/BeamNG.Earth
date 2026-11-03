@@ -65,6 +65,7 @@ local postfx = require('beamngEarth/postfx')       -- no far depth-of-field blur
 local gps = require('beamngEarth/gps')               -- the game's GPS route to a place picked on the world map
 local freight = require('beamngEarth/freight')       -- freight market, multi-truck co-op hauls and damage
 local expeditions = require('beamngEarth/expeditions') -- overlanding tours, 4x4 trails and Home Base
+local convoy = require('beamngEarth/convoy')           -- CB radio and convoy radar app
 local collisionfoci = require('beamngEarth/collisionfoci') -- other vehicles' collision islands
 local terrainpatch = require('beamngEarth/terrainpatch')   -- ground under the islands off the terrain block
 local farcars = require('beamngEarth/farcars')             -- far player cars saved, taken out and put back
@@ -1359,6 +1360,7 @@ local function hudTexts()
   hudInput.banner = (st.inOurLevel or st.active) and banner.enabled and banner.current() or nil
   hudInput.hidden = credits.hiddenByUi()
   hudInput.freight = shown and freight.getUiState(st.player and st.player.lat, st.player and st.player.lon) or nil
+  hudInput.convoy = shown and convoy.getUiState(st.player and st.player.lat, st.player and st.player.lon, getPlayerVehicle(0)) or nil
   return hudInput
 end
 
@@ -1863,6 +1865,7 @@ local function onClientEndMission()
   gps.reset()
   pcall(freight.reset)
   pcall(expeditions.reset)
+  pcall(convoy.reset)
   do local stg = rawget(_G, 'beamngEarth_settings') if stg and stg.redirectBigMap then stg.redirectBigMap(false) end end
   seasonlook.restore()
   -- runs before the level deletes its objects (server/server.lua:19 vs :34): delete the far tiles

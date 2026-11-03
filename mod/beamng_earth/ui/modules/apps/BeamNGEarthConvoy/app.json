@@ -1,0 +1,16 @@
+{
+  "name": "BeamNGEarthConvoy",
+  "author": "Antigravity & BeamNG.Earth",
+  "version": "1.0",
+  "description": "In-Game CB Radio & Convoy Radar tracking teammate distances, speeds, and live CB chatter presets.",
+  "types": [
+    "ui.apps.categories.navigation"
+  ],
+  "domElement": "<beamng-earth-convoy></beamng-earth-convoy>",
+  "css": {
+    "width": "310px",
+    "height": "170px",
+    "top": "160px",
+    "left": "20px"
+  }
+}

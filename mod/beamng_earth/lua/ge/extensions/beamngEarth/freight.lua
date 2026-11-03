@@ -1051,6 +1051,14 @@ function M.onRemoteLogistics(msg)
     return
   end
 
+  if msg.type == 'cb_radio' then
+    local convoy = require('beamngEarth/convoy')
+    if convoy and convoy.receiveRadioMessage then
+      convoy.receiveRadioMessage(msg)
+    end
+    return
+  end
+
   if msg.type == 'abandon' then
     companyState.activeContract = nil
     M.saveState()
