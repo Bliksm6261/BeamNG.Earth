@@ -594,6 +594,17 @@ function M.uiFreightSetCompanyName(name)
   return { ok = ok, name = res }
 end
 
+function M.uiFreightPurchaseUpgrade(upgradeId)
+  local freight = require('beamngEarth/freight')
+  local ok, res = freight.purchaseUpgrade(upgradeId)
+  return { ok = ok, result = res }
+end
+
+function M.uiFreightUpgrades()
+  local freight = require('beamngEarth/freight')
+  return freight.getUpgradesList()
+end
+
 -- Overlanding Expeditions & Home Base UI Bridge
 function M.uiExpeditionState()
   local core = ext('beamngEarth_core')

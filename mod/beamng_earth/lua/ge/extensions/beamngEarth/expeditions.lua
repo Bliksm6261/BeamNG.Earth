@@ -222,6 +222,15 @@ function M.startExpedition(tourId)
   end
   if not tour then return false, 'Tour not found' end
 
+  -- Grade 5 extreme trail certification check
+  if tour.grade and tour.grade >= 5 then
+    local fr = rawget(_G, 'beamngEarth_freight') or (extensions and extensions.beamngEarth_freight)
+    if not fr then pcall(function() fr = require('beamngEarth/freight') end) end
+    if fr and fr.hasUpgrade and not fr.hasUpgrade('cert_rock_crawl') then
+      return false, 'Requires Extreme Rock Crawling Certification ($18,000 in Fleet Upgrades)'
+    end
+  end
+
   state.activeTour = {
     id = tour.id,
     name = tour.name,
@@ -449,11 +458,38 @@ function M.getUiState(playerLat, playerLon)
     distToChk = places.distance(playerLat, playerLon, currentChk.lat, currentChk.lon)
   end
 
+  local fr = rawget(_G, 'beamngEarth_freight') or (extensions and extensions.beamngEarth_freight)
+  if not fr then pcall(function() fr = require('beamngEarth/freight') end) end
+
+  local toursWithLocks = {}
+  for _, t in ipairs(M.TOURS) do
+    local isLocked = false
+    local lockReason = nil
+    if t.grade and t.grade >= 5 and fr and fr.hasUpgrade and not fr.hasUpgrade('cert_rock_crawl') then
+      isLocked = true
+      lockReason = 'Requires Grade 5 Rock Crawling Certification ($18,000)'
+    end
+    toursWithLocks[#toursWithLocks + 1] = {
+      id = t.id,
+      name = t.name,
+      region = t.region,
+      grade = t.grade,
+      gradeLabel = t.gradeLabel,
+      distanceKm = t.distanceKm,
+      terrain = t.terrain,
+      description = t.description,
+      recommendedVehicle = t.recommendedVehicle,
+      checkpoints = t.checkpoints,
+      locked = isLocked,
+      lockReason = lockReason
+    }
+  end
+
   return {
     homeBase = state.homeBase,
     cityBases = M.CITY_BASES,
     passport = state.passport,
-    tours = M.TOURS,
+    tours = toursWithLocks,
     activeTour = tour,
     checkpointIndex = state.checkpointIndex,
     currentCheckpoint = currentChk,

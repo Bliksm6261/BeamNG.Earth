@@ -206,4 +206,35 @@ do
   T.check(expeditions.getPassport().stamps['namib_dunes'] ~= nil, 'remote complete awarded passport stamp')
 end
 
+--------------------------------------------------------------------------------
+-- 6. Extreme Grade 5 Tour Certification Check
+--------------------------------------------------------------------------------
+do
+  expeditions.reset()
+
+  -- Fake freight upgrade status: uncertified
+  rawget(_G, 'package').loaded['beamngEarth/freight'] = {
+    hasUpgrade = function(id) return id ~= 'cert_rock_crawl' end
+  }
+
+  local startOk, err = expeditions.startExpedition('richtersveld_crawl')
+  T.check(not startOk, 'Grade 5 expedition blocked when uncertified')
+  T.check(err:find('Rock Crawling Certification'), 'error specifies rock crawl cert requirement')
+
+  local uiSt = expeditions.getUiState(0, 0)
+  local crawlTour = nil
+  for _, t in ipairs(uiSt.tours) do
+    if t.id == 'richtersveld_crawl' then crawlTour = t; break end
+  end
+  T.check(crawlTour and crawlTour.locked == true, 'Grade 5 tour locked in UI state')
+
+  -- Now certify
+  rawget(_G, 'package').loaded['beamngEarth/freight'] = {
+    hasUpgrade = function(id) return true end
+  }
+
+  local startOk2 = expeditions.startExpedition('richtersveld_crawl')
+  T.check(startOk2, 'Grade 5 expedition unlocked when certified')
+end
+
 T.done('test_expeditions')

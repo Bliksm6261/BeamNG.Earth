@@ -241,4 +241,66 @@ do
   T.check(freight.getCompany().name == 'Trans-Africa Convoy Co-op', 'remote set_company_name synced')
 end
 
+--------------------------------------------------------------------------------
+-- 7. Company Fleet Upgrades & Carrier Licensing
+--------------------------------------------------------------------------------
+do
+  freight.reset()
+  local comp = freight.getCompany()
+  comp.vault = 100000 -- grant test funds
+  comp.upgrades = {}
+
+  -- Check initial upgrades catalog
+  local list = freight.getUpgradesList()
+  T.check(#list >= 8, 'upgrades catalog contains all licenses, garage bays, and certs')
+
+  -- Generate jobs without HazMat license
+  local jhb = { name = 'Johannesburg', lat = -26.2041, lon = 28.0473 }
+  local jobs = freight.generateJobs(jhb, 100)
+  local hazmatJob = nil
+  for _, j in ipairs(jobs) do
+    if j.cargo.hazmat then hazmatJob = j; break end
+  end
+
+  if hazmatJob then
+    T.check(hazmatJob.locked == true, 'HazMat contract locked without carrier license')
+    local acceptOk, err = freight.acceptContract(hazmatJob, 1, 'Driver 1')
+    T.check(not acceptOk, 'blocked accepting locked HazMat contract')
+  end
+
+  -- Purchase HazMat license
+  local buyOk, bought = freight.purchaseUpgrade('license_hazmat')
+  T.check(buyOk and bought.id == 'license_hazmat', 'purchaseUpgrade succeeded')
+  T.check(freight.hasUpgrade('license_hazmat'), 'hasUpgrade confirms license owned')
+  T.check(comp.vault == 65000, 'vault debited correctly for HazMat license ($35,000)')
+
+  -- Regenerate jobs: HazMat now unlocked
+  local jobs2 = freight.generateJobs(jhb, 100)
+  for _, j in ipairs(jobs2) do
+    if j.cargo.hazmat then
+      T.check(j.locked == false, 'HazMat contract unlocked with license')
+      break
+    end
+  end
+
+  -- Test Workshop Bay (-30% damage penalty)
+  local testSlot = { grossPayout = 10000, cargoHealth = 80 }
+  local cargo = { fragile = false, hazmat = false }
+  local penaltyBefore = freight.calculatePenalty(testSlot, cargo)
+
+  freight.purchaseUpgrade('garage_repair_bay')
+  T.check(freight.hasUpgrade('garage_repair_bay'), 'garage_repair_bay owned')
+  local penaltyAfter = freight.calculatePenalty(testSlot, cargo)
+  T.check(penaltyAfter == math.floor(penaltyBefore * 0.70), 'heavy workshop bay applied 30% damage penalty discount')
+
+  -- Test Remote upgrade synchronization
+  freight.onRemoteLogistics({
+    type = 'purchase_upgrade',
+    upgradeId = 'license_reefer',
+    cost = 25000,
+    playerName = 'Teammate'
+  })
+  T.check(freight.hasUpgrade('license_reefer'), 'remote purchase_upgrade synced to local fleet')
+end
+
 T.done('test_freight')

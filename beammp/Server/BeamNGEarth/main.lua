@@ -181,6 +181,18 @@ function G.onLogistics(pid, msg, playerName)
     end
   end
 
+  if msg.type == 'purchase_upgrade' then
+    local comp = G.logistics.company
+    comp.upgrades = comp.upgrades or {}
+    local upId = tostring(msg.upgradeId)
+    local cost = tonumber(msg.cost) or 0
+    if not comp.upgrades[upId] and (comp.vault or 0) >= cost then
+      comp.vault = comp.vault - cost
+      comp.upgrades[upId] = { purchasedAt = os.time(), cost = cost }
+      return { type = 'purchase_upgrade', upgradeId = upId, cost = cost, company = comp, playerName = playerName }, -1
+    end
+  end
+
   if msg.type == 'accept' then
     if type(msg.contract) == 'table' then
       G.logistics.activeContract = msg.contract

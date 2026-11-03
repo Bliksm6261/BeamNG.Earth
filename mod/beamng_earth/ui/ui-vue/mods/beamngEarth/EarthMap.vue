@@ -276,6 +276,9 @@
           <button class="hq-tab-btn" :class="{ active: hqTab === 'freight' }" @click="hqTab = 'freight'">
             🚚 Trucking Logistics
           </button>
+          <button class="hq-tab-btn" :class="{ active: hqTab === 'upgrades' }" @click="hqTab = 'upgrades'">
+            🛠️ Fleet &amp; Upgrades
+          </button>
         </div>
 
         <div class="freight-body">
@@ -466,8 +469,10 @@
                   </div>
                   <div class="job-bottom">
                     <span class="vehicle-rec">🚙 {{ tour.recommendedVehicle }}</span>
-                    <button class="map-btn primary small" @click="startExpedition(tour.id)">🧭 Plan Trip &amp; Route</button>
+                    <button v-if="!tour.locked" class="map-btn primary small" @click="startExpedition(tour.id)">🧭 Plan Trip &amp; Route</button>
+                    <button v-else class="map-btn disabled small" :title="tour.lockReason">🔒 Requires Cert</button>
                   </div>
+                  <div v-if="tour.locked" class="job-lock-hint">🔒 {{ tour.lockReason }}</div>
                 </div>
               </div>
             </div>
@@ -543,8 +548,63 @@
                   </div>
                   <div class="job-bottom">
                     <div class="payout-amount">${{ job.totalPayout.toLocaleString() }}</div>
-                    <button class="map-btn primary small" @click="acceptJob(job.id)">Accept &amp; Route</button>
+                    <button v-if="!job.locked" class="map-btn primary small" @click="acceptJob(job.id)">Accept &amp; Route</button>
+                    <button v-else class="map-btn disabled small" :title="job.lockReason">🔒 Requires License</button>
                   </div>
+                  <div v-if="job.locked" class="job-lock-hint">🔒 {{ job.lockReason }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 4: FLEET UPGRADES & LICENSING -->
+          <div v-else-if="hqTab === 'upgrades'" class="upgrades-tab-content">
+            <div class="upgrades-banner">
+              <div class="upgrades-banner-left">
+                <span class="banner-icon">🛠️</span>
+                <div>
+                  <div class="banner-title">Company Fleet Upgrades &amp; Carrier Licenses</div>
+                  <div class="banner-desc">Invest company vault capital into regulatory certifications, garage facilities, and overland rig modifications.</div>
+                </div>
+              </div>
+              <div class="vault-balance-badge">
+                <span class="vault-badge-label">Company Vault</span>
+                <span class="vault-badge-amount">${{ freightData.company ? freightData.company.vault.toLocaleString() : '25,000' }}</span>
+              </div>
+            </div>
+
+            <!-- Upgrade Category Filter -->
+            <div class="upgrade-filters">
+              <button class="filter-pill" :class="{ active: upgradeFilter === 'all' }" @click="upgradeFilter = 'all'">All Upgrades</button>
+              <button class="filter-pill" :class="{ active: upgradeFilter === 'license' }" @click="upgradeFilter = 'license'">Carrier Licenses</button>
+              <button class="filter-pill" :class="{ active: upgradeFilter === 'garage' }" @click="upgradeFilter = 'garage'">Workshop &amp; Garage</button>
+              <button class="filter-pill" :class="{ active: upgradeFilter === 'overland' }" @click="upgradeFilter = 'overland'">Overland Rig Certs</button>
+            </div>
+
+            <!-- Upgrades Grid -->
+            <div class="upgrades-grid">
+              <div v-for="up in filteredUpgrades" :key="up.id" class="upgrade-card" :class="{ owned: up.purchased }">
+                <div class="up-card-top">
+                  <span class="up-icon">{{ up.icon }}</span>
+                  <span class="up-category-badge">{{ up.category.toUpperCase() }}</span>
+                  <span v-if="up.purchased" class="up-status-badge owned">✓ OWNED &amp; ACTIVE</span>
+                  <span v-else class="up-cost-tag">${{ up.cost.toLocaleString() }}</span>
+                </div>
+                <div class="up-name">{{ up.name }}</div>
+                <div class="up-desc">{{ up.description }}</div>
+                <div class="up-benefit">
+                  <span class="benefit-star">★</span> <strong>Perk:</strong> {{ up.benefit }}
+                </div>
+                <div class="up-actions">
+                  <div v-if="up.purchased" class="owned-indicator">
+                    Active for all company drivers &amp; convoy rigs
+                  </div>
+                  <button v-else-if="up.canAfford" class="map-btn primary small up-buy-btn" @click="buyUpgrade(up.id)">
+                    Purchase with Vault Funds (${{ up.cost.toLocaleString() }})
+                  </button>
+                  <button v-else class="map-btn disabled small up-buy-btn" disabled>
+                    Insufficient Funds (${{ up.cost.toLocaleString() }})
+                  </button>
                 </div>
               </div>
             </div>
@@ -764,6 +824,21 @@ function abandonContract() {
 function spawnTrailer() {
   engineLua('beamngEarth_settings.uiFreightSpawnTrailer()', () => {
     pollFreight()
+  })
+}
+
+const upgradeFilter = ref('all')
+
+const filteredUpgrades = computed(() => {
+  const list = freightData.value.upgrades || []
+  if (upgradeFilter.value === 'all') return list
+  return list.filter(u => u.category === upgradeFilter.value)
+})
+
+function buyUpgrade(upgradeId) {
+  engineLua(`beamngEarth_settings.uiFreightPurchaseUpgrade(${luaStr(upgradeId)})`, () => {
+    pollFreight()
+    pollExpeditions()
   })
 }
 
@@ -1976,4 +2051,58 @@ const fmtLatLon = mm.fmtLatLon
 .base-result-item:hover { background: rgba(255, 149, 0, 0.15); }
 .base-res-name { font-size: 13px; font-weight: 600; color: #fff; }
 .base-res-detail { font-size: 11px; color: #9aa4ae; margin-top: 2px; }
+
+/* Fleet Upgrades & Licensing Tab */
+.upgrades-tab-content { display: flex; flex-direction: column; gap: 14px; }
+.upgrades-banner {
+  background: linear-gradient(135deg, rgba(30, 36, 48, 0.95), rgba(18, 22, 30, 0.95));
+  border: 1px solid rgba(255, 149, 0, 0.3); border-radius: 6px; padding: 14px 18px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.upgrades-banner-left { display: flex; align-items: center; gap: 14px; }
+.banner-icon { font-size: 32px; }
+.banner-title { font-size: 16px; font-weight: 700; color: #fff; }
+.banner-desc { font-size: 12px; color: #9aa4ae; margin-top: 2px; max-width: 480px; }
+.vault-balance-badge {
+  background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(40, 167, 69, 0.4); border-radius: 6px;
+  padding: 8px 14px; display: flex; flex-direction: column; align-items: flex-end;
+}
+.vault-badge-label { font-size: 10px; text-transform: uppercase; color: #9aa4ae; font-weight: 600; }
+.vault-badge-amount { font-size: 18px; font-weight: 700; color: #28a745; }
+
+.upgrade-filters { display: flex; gap: 8px; margin-bottom: 2px; }
+.filter-pill {
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 20px;
+  padding: 4px 12px; font-size: 12px; font-weight: 600; color: #c0c8d4; cursor: pointer; transition: all 0.15s ease;
+}
+.filter-pill:hover { background: rgba(255, 149, 0, 0.15); border-color: #ff9500; color: #fff; }
+.filter-pill.active { background: #ff9500; border-color: #ff9500; color: #111; font-weight: 700; }
+
+.upgrades-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.upgrade-card {
+  background: rgba(20, 24, 32, 0.9); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px;
+  padding: 14px; display: flex; flex-direction: column; gap: 8px; transition: border-color 0.15s ease;
+}
+.upgrade-card:hover { border-color: rgba(255, 149, 0, 0.4); }
+.upgrade-card.owned { border-color: rgba(40, 167, 69, 0.5); background: rgba(18, 30, 24, 0.7); }
+
+.up-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.up-icon { font-size: 22px; }
+.up-category-badge { font-size: 10px; font-weight: 700; color: #9aa4ae; letter-spacing: 0.05em; margin-right: auto; }
+.up-cost-tag { font-size: 14px; font-weight: 700; color: #ffb54a; }
+.up-status-badge.owned {
+  background: rgba(40, 167, 69, 0.2); color: #28a745; font-size: 11px; font-weight: 700;
+  padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(40, 167, 69, 0.4);
+}
+.up-name { font-size: 15px; font-weight: 700; color: #fff; }
+.up-desc { font-size: 12px; color: #b0b8c4; line-height: 1.35; flex-grow: 1; }
+.up-benefit {
+  background: rgba(0, 0, 0, 0.3); border-radius: 4px; padding: 6px 10px; font-size: 12px; color: #eef1f4;
+}
+.benefit-star { color: #ff9500; font-size: 13px; margin-right: 4px; }
+.up-actions { margin-top: 4px; }
+.up-buy-btn { width: 100%; text-align: center; }
+.owned-indicator { font-size: 11px; color: #28a745; font-weight: 600; text-align: center; padding: 4px 0; }
+.job-lock-hint { font-size: 11px; color: #e07a5f; margin-top: 4px; font-weight: 600; }
+.map-btn.disabled { opacity: 0.5; cursor: not-allowed; background: rgba(255, 255, 255, 0.08); color: #888; }
 </style>

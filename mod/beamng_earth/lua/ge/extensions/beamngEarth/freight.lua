@@ -45,6 +45,82 @@ M.CARGOS = {
   { id = 'wind_blades', name = 'Wind Turbine Hubs & Nacelles', category = 'heavy', fragile = true, hazmat = false, minKg = 20000, maxKg = 28000, ratePerKm = 25.0, truckCounts = {4} }
 }
 
+-- Company Fleet Upgrades & Carrier Licensing Catalog
+M.UPGRADES = {
+  {
+    id = 'license_hazmat',
+    category = 'license',
+    name = 'Commercial HazMat Carrier License',
+    icon = '☣️',
+    cost = 35000,
+    description = 'Authorizes transport of hazardous materials (commercial explosives, bulk diesel, and refinery chemicals). High gross payouts with strict spill liabilities.',
+    benefit = 'Unlocks HazMat transport contracts'
+  },
+  {
+    id = 'license_heavy_haul',
+    category = 'license',
+    name = 'Abnormal & Mega Haul Certification',
+    icon = '🚜',
+    cost = 50000,
+    description = 'Government permit for multi-truck convoys and oversized mining/industrial loads over 100 metric tonnes.',
+    benefit = 'Unlocks 4-truck Mega Haul contracts'
+  },
+  {
+    id = 'license_reefer',
+    category = 'license',
+    name = 'Cold Chain & Perishables Certification',
+    icon = '❄️',
+    cost = 25000,
+    description = 'Sanitary and temperature-controlled transport standards for high-value pharmaceuticals, vaccines, and fresh export produce.',
+    benefit = 'Unlocks premium reefer loads with +15% payout'
+  },
+  {
+    id = 'license_cross_border',
+    category = 'license',
+    name = 'SADC Cross-Border Carnet & Customs Bond',
+    icon = '🛂',
+    cost = 40000,
+    description = 'Expedited border transit permits across South Africa, Namibia, Botswana, Zimbabwe, Mozambique, Zambia, and Tanzania.',
+    benefit = 'Eliminates cross-border customs surcharges and delay penalties'
+  },
+  {
+    id = 'garage_repair_bay',
+    category = 'garage',
+    name = 'Heavy Vehicle Workshop & Crane Bay',
+    icon = '🔧',
+    cost = 30000,
+    description = 'Equips Home Base with specialized heavy truck repair lifts, laser wheel alignment, and body straightening jacks.',
+    benefit = '-30% damage penalty deduction on all company hauls'
+  },
+  {
+    id = 'garage_bulk_fuel',
+    category = 'garage',
+    name = 'Depot Bulk Fuel Tank & Fast Pump',
+    icon = '⛽',
+    cost = 20000,
+    description = '50,000-litre wholesale diesel storage tank installed at Home Base HQ with commercial high-flow nozzle.',
+    benefit = '-40% fuel refill cost at Home Base'
+  },
+  {
+    id = 'cert_rock_crawl',
+    category = 'overland',
+    name = 'Extreme Rock Crawling Certification',
+    icon = '🪨',
+    cost = 18000,
+    description = 'Advanced technical driver training and heavy-duty rock armor (underbody skid plates, differential locks, winch kit).',
+    benefit = 'Unlocks Grade 5 extreme wilderness trails (Richtersveld)'
+  },
+  {
+    id = 'cert_safari_snorkel',
+    category = 'overland',
+    name = 'Expedition Snorkel & Fording Gear',
+    icon = '🌊',
+    cost = 12000,
+    description = 'Raised cold-air intake snorkel, extended differential breathers, and waterproofed electronic harnesses.',
+    benefit = 'Enables deep river fording on Okavango and Zambezi expeditions'
+  }
+}
+
 -- Target truck distribution for an 8-job board:
 -- 3x 1-truck solo jobs, 2x 2-truck duo jobs, 2x 3-truck convoys, 1x 4-truck mega haul
 M.BOARD_DISTRIBUTION = { 1, 1, 1, 2, 2, 3, 3, 4 }
@@ -170,6 +246,24 @@ function M.generateJobs(originHub, epoch, allHubs)
     local prefix = originHub.name:sub(1, 2):upper()
     local jobId = string.format("#%s-%04d", prefix, (seed + i * 137) % 9000 + 1000)
 
+    -- License requirement checks
+    local isLocked = false
+    local lockReason = nil
+    if cargo.hazmat and not M.hasUpgrade('license_hazmat') then
+      isLocked = true
+      lockReason = 'Requires HazMat Carrier License ($35,000)'
+    elseif trucksReq == 4 and not M.hasUpgrade('license_heavy_haul') then
+      isLocked = true
+      lockReason = 'Requires Abnormal & Mega Haul Permit ($50,000)'
+    end
+
+    -- Cold Chain bonus (+15%) if license_reefer is owned
+    if cargo.category == 'reefer' and M.hasUpgrade('license_reefer') then
+      payoutPerTruck = math.floor(payoutPerTruck * 1.15)
+      totalPayout = payoutPerTruck * trucksReq
+      for _, s in ipairs(slots) do s.grossPayout = payoutPerTruck end
+    end
+
     jobs[#jobs + 1] = {
       id = jobId,
       origin = { name = originHub.name, lat = originHub.lat, lon = originHub.lon },
@@ -182,6 +276,8 @@ function M.generateJobs(originHub, epoch, allHubs)
       totalPayout = totalPayout,
       payoutPerTruck = payoutPerTruck,
       slots = slots,
+      locked = isLocked,
+      lockReason = lockReason,
       status = 'available' -- 'available', 'accepted', 'in_transit', 'completed', 'failed'
     }
   end
@@ -199,6 +295,12 @@ function M.calculatePenalty(slot, cargo)
     penaltyFactor = penaltyFactor * 1.5 -- severe HazMat spill penalty
   end
   local penalty = math.floor(slot.grossPayout * lostFrac * penaltyFactor)
+
+  -- Apply Heavy Vehicle Workshop Bay bonus (-30% penalty)
+  if M.hasUpgrade and M.hasUpgrade('garage_repair_bay') then
+    penalty = math.floor(penalty * 0.70)
+  end
+
   return math.min(slot.grossPayout, penalty)
 end
 
@@ -210,13 +312,77 @@ local companyState = {
     completedDeliveries = 0,
     totalTonnesHauled = 0,
     totalEarnings = 0,
-    reputation = 100
+    reputation = 100,
+    upgrades = {}
   },
   activeContract = nil
 }
 
 function M.getCompany()
   return companyState.company
+end
+
+function M.hasUpgrade(upgradeId)
+  local c = companyState.company
+  return c and c.upgrades and c.upgrades[upgradeId] ~= nil
+end
+
+function M.getUpgradesList()
+  local c = companyState.company
+  local vault = c and c.vault or 0
+  local list = {}
+  for _, up in ipairs(M.UPGRADES) do
+    local isBought = c and c.upgrades and c.upgrades[up.id] ~= nil
+    list[#list + 1] = {
+      id = up.id,
+      category = up.category,
+      name = up.name,
+      icon = up.icon,
+      cost = up.cost,
+      description = up.description,
+      benefit = up.benefit,
+      purchased = isBought,
+      purchasedAt = isBought and c.upgrades[up.id].purchasedAt or nil,
+      canAfford = not isBought and (vault >= up.cost)
+    }
+  end
+  return list
+end
+
+function M.purchaseUpgrade(upgradeId)
+  local c = companyState.company
+  if not c then return false, 'Company not initialized' end
+  c.upgrades = c.upgrades or {}
+
+  if c.upgrades[upgradeId] then
+    return false, 'Upgrade already purchased'
+  end
+
+  local target = nil
+  for _, up in ipairs(M.UPGRADES) do
+    if up.id == upgradeId then target = up; break end
+  end
+  if not target then return false, 'Upgrade not found' end
+
+  if (c.vault or 0) < target.cost then
+    return false, string.format("Insufficient company funds ($%d needed, vault has $%d)", target.cost, c.vault or 0)
+  end
+
+  c.vault = c.vault - target.cost
+  c.upgrades[upgradeId] = {
+    purchasedAt = os.time(),
+    cost = target.cost
+  }
+  M.saveState()
+
+  broadcastLogistics({
+    type = 'purchase_upgrade',
+    upgradeId = upgradeId,
+    cost = target.cost,
+    company = c
+  })
+
+  return true, target
 end
 
 function M.setCompanyName(name)
@@ -302,6 +468,10 @@ end
 
 -- Accept a contract from the market
 function M.acceptContract(job, playerPid, playerName, slotIndex)
+  if job and job.locked then
+    return false, job.lockReason or 'Company lacks required carrier certification'
+  end
+
   if companyState.activeContract and companyState.activeContract.status == 'in_transit' then
     return false, 'A contract is already in transit'
   end
@@ -562,7 +732,8 @@ function M.getUiState(playerLat, playerLon)
     company = companyState.company,
     activeContract = c,
     availableJobs = available,
-    canDeliver = c and c.currentDistanceM and c.currentDistanceM <= 40
+    canDeliver = c and c.currentDistanceM and c.currentDistanceM <= 40,
+    upgrades = M.getUpgradesList()
   }
 end
 
@@ -592,6 +763,23 @@ function M.onRemoteLogistics(msg)
       companyState.activeContract = msg.state.activeContract
     end
     M.saveState()
+    return
+  end
+
+  if msg.type == 'purchase_upgrade' then
+    if msg.company then
+      companyState.company = msg.company
+    elseif msg.upgradeId then
+      companyState.company.upgrades = companyState.company.upgrades or {}
+      companyState.company.upgrades[msg.upgradeId] = { purchasedAt = os.time(), cost = msg.cost }
+      if msg.cost then
+        companyState.company.vault = math.max(0, (companyState.company.vault or 0) - msg.cost)
+      end
+    end
+    M.saveState()
+    if rawget(_G, 'guihooks') and guihooks.trigger then
+      guihooks.trigger('Message', { ttl = 6, msg = string.format("[OTBT Fleet] %s purchased: %s!", msg.playerName or 'Teammate', msg.upgradeId), category = 'freight' })
+    end
     return
   end
 

@@ -132,6 +132,13 @@ do
   rep, target = G.onLogistics(1, { type = 'set_company_name', name = 'Kalahari Express' }, 'Alpha')
   T.check(rep and rep.type == 'set_company_name' and target == -1, 'set_company_name broadcast')
   T.check(G.logistics.company.name == 'Kalahari Express', 'server updated group name')
+
+  -- 9. purchase_upgrade
+  G.logistics.company.vault = 80000
+  rep, target = G.onLogistics(1, { type = 'purchase_upgrade', upgradeId = 'license_hazmat', cost = 35000 }, 'Alpha')
+  T.check(rep and rep.type == 'purchase_upgrade' and target == -1, 'purchase_upgrade broadcast')
+  T.check(G.logistics.company.upgrades['license_hazmat'] ~= nil, 'server stored upgrade')
+  T.check(G.logistics.company.vault == 45000, 'server vault deducted for upgrade')
 end
 
 T.done('test_beammp_plugin')
