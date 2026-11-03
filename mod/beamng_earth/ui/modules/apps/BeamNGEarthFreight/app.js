@@ -17,12 +17,19 @@ angular.module('beamng.apps')
             '<span>📍 {{ destName }} ({{ distRemaining }})</span>' +
             '<span style="color:#FFB54A;font-weight:bold;">${{ payout }}</span>' +
           '</div>' +
+          '<div ng-show="hasDriverStatus" layout="row" layout-align="space-between center" style="margin-top:4px;font-size:11px;color:#a0aab8;border-top:1px solid rgba(255,255,255,0.08);padding-top:3px;">' +
+            '<span>⛽ Fuel: <strong ng-style="fuelStyle">{{ fuelPercent }}%</strong> ({{ fuelLiters }}L)</span>' +
+            '<span>💤 Fatigue: <strong ng-style="fatigueStyle">{{ fatiguePercent }}%</strong></span>' +
+          '</div>' +
           '<div ng-show="arrived" style="margin-top:4px;background:#28a745;color:#fff;text-align:center;padding:3px;border-radius:3px;font-weight:bold;font-size:12px;animation:pulse 1.5s infinite;">' +
             '🎯 DESTINATION REACHED — DROP OFF OR DOCK FOR +20% BONUS' +
           '</div>' +
         '</div>' +
         '<div ng-show="!active && company && !hidden" style="background:rgba(12,15,20,0.65);border-left:4px solid #6c757d;border-radius:4px;padding:4px 10px;color:#c0c8d4;font-size:12px;">' +
-          '<span>🏢 {{ company.name }} &middot; Vault: <strong style="color:#28a745;">${{ company.vault }}</strong> &middot; Rep: {{ company.reputation }}%</span>' +
+          '<div layout="row" layout-align="space-between center">' +
+            '<span>🏢 {{ company.name }} &middot; Vault: <strong style="color:#28a745;">${{ company.vault }}</strong> &middot; Rep: {{ company.reputation }}%</span>' +
+            '<span ng-show="hasDriverStatus" style="font-size:11px;color:#a0aab8;">⛽ {{ fuelPercent }}% &middot; 💤 {{ fatiguePercent }}%</span>' +
+          '</div>' +
         '</div>' +
       '</div>',
     replace: true,
@@ -38,6 +45,12 @@ angular.module('beamng.apps')
       scope.arrived = false
       scope.hidden = false
       scope.healthStyle = { 'background': '#28a745', 'color': '#fff' }
+      scope.hasDriverStatus = false
+      scope.fuelPercent = 100
+      scope.fuelLiters = 400
+      scope.fatiguePercent = 0
+      scope.fuelStyle = { color: '#28a745' }
+      scope.fatigueStyle = { color: '#28a745' }
 
       var hello = function (on) {
         bngApi.engineLua('if beamngEarth_core and beamngEarth_core.hudApp then beamngEarth_core.hudApp("freight", ' + on + ') end')
@@ -52,6 +65,14 @@ angular.module('beamng.apps')
             return
           }
           scope.company = fr.company
+          if (fr.driverStatus) {
+            scope.hasDriverStatus = true
+            scope.fuelPercent = fr.driverStatus.fuelPercent != null ? fr.driverStatus.fuelPercent : 100
+            scope.fuelLiters = fr.driverStatus.fuelLiters != null ? fr.driverStatus.fuelLiters : 400
+            scope.fatiguePercent = fr.driverStatus.fatiguePercent != null ? fr.driverStatus.fatiguePercent : 0
+            scope.fuelStyle = { color: scope.fuelPercent > 25 ? '#28a745' : '#dc3545' }
+            scope.fatigueStyle = { color: scope.fatiguePercent < 75 ? '#28a745' : '#dc3545' }
+          }
           var c = fr.activeContract
           if (c && c.status === 'in_transit') {
             scope.active = true

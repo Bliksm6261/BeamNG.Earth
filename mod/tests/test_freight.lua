@@ -350,4 +350,56 @@ do
   T.check(comp.reputation >= startRep + 7, 'reputation rewarded with extra precision skill bonus (+7)')
 end
 
+--------------------------------------------------------------------------------
+-- 9. Fuel Stops & Driver Fatigue Simulation
+--------------------------------------------------------------------------------
+do
+  freight.reset()
+  local comp = freight.getCompany()
+  comp.vault = 50000
+
+  -- 1. Initial status
+  local st = freight.getDriverStatus(-26.2041, 28.0473) -- At Johannesburg hub
+  T.check(st.fuelPercent == 100, 'initial fuel is 100%')
+  T.check(st.fatiguePercent == 0, 'initial fatigue is 0%')
+  T.check(st.isNearTown == true, 'near hub town')
+  T.check(st.canRefuel == false, 'cannot refuel when tank is already full')
+
+  -- 2. Simulate driving: fuel drops to 200L (50%), fatigue reaches 70%
+  freight._setDriverStatus({ fuelLiters = 200.0, fuelPercent = 50.0, fatiguePercent = 70.0 })
+  local stMid = freight.getDriverStatus(-26.2041, 28.0473)
+  T.check(stMid.fuelPercent == 50, 'fuel status updated to 50%')
+  T.check(stMid.fatiguePercent == 70, 'fatigue status updated to 70%')
+  T.check(stMid.canRefuel == true, 'can refuel when tank has deficit near town')
+  T.check(stMid.refillCost == math.floor(200 * 1.85), 'refill cost calculated at standard $1.85/L')
+
+  -- 3. Refuel vehicle near town
+  local vaultBefore = comp.vault
+  local refuelOk, cost = freight.refuelVehicle(-26.2041, 28.0473)
+  T.check(refuelOk, 'vehicle refueled successfully')
+  T.check(cost == math.floor(200 * 1.85), 'cost deducted correctly')
+  T.check(comp.vault == vaultBefore - cost, 'company vault updated after refuel')
+  local stRefueled = freight.getDriverStatus(-26.2041, 28.0473)
+  T.check(stRefueled.fuelPercent == 100, 'fuel restored to 100% after refuel')
+
+  -- 4. Bulk fuel perk discount at Home Base
+  comp.upgrades = { garage_bulk_fuel = { purchasedAt = 1000, cost = 20000 } }
+  package.loaded['beamngEarth/expeditions'] = {
+    getHomeBase = function() return { name = 'Custom HQ', lat = -26.2000, lon = 28.0400 } end
+  }
+  freight._setDriverStatus({ fuelLiters = 100.0, fuelPercent = 25.0 })
+  local stBase = freight.getDriverStatus(-26.2005, 28.0405) -- <100m from base
+  T.check(stBase.isAtBase == true, 'detected at Home Base HQ')
+  T.check(stBase.pricePerLiter == 1.10, 'received 40% wholesale diesel discount ($1.10/L) at Home Base')
+  T.check(stBase.refillCost == 300 * 1.10, 'discounted refill cost for 300L ($330)')
+
+  -- 5. Driver Rest Simulation
+  freight._setDriverStatus({ fatiguePercent = 90.0 })
+  local restOk, hours = freight.restDriver(8)
+  T.check(restOk, 'rest completed')
+  T.check(hours == 8, 'rested for 8 hours')
+  local stRested = freight.getDriverStatus(-26.2005, 28.0405)
+  T.check(stRested.fatiguePercent == 0, 'driver fatigue reset to 0% after 8h sleep')
+end
+
 T.done('test_freight')

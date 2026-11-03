@@ -605,6 +605,21 @@ function M.uiFreightUpgrades()
   return freight.getUpgradesList()
 end
 
+function M.uiFreightRefuel()
+  local core = ext('beamngEarth_core')
+  local st = core and core._state and core._state() or nil
+  local pl = st and st.player
+  local freight = require('beamngEarth/freight')
+  local ok, res = freight.refuelVehicle(pl and pl.lat, pl and pl.lon)
+  return { ok = ok, result = res }
+end
+
+function M.uiFreightRest(hours)
+  local freight = require('beamngEarth/freight')
+  local ok, res = freight.restDriver(hours or 8)
+  return { ok = ok, result = res }
+end
+
 -- Overlanding Expeditions & Home Base UI Bridge
 function M.uiExpeditionState()
   local core = ext('beamngEarth_core')

@@ -670,6 +670,120 @@ end
 local lastDamageCheck = 0
 local baselineDamage = {}
 
+-- Driver Fatigue & Fuel Simulation State
+local driverStatus = {
+  fatiguePercent = 0.0,
+  fuelPercent = 100.0,
+  fuelLiters = 400.0,
+  tankCapacityLiters = 400.0,
+  lastCheckTime = 0,
+  fatigueWarned = false
+}
+
+function M.getDriverStatus(lat, lon)
+  local isAtBase = false
+  local exp = rawget(_G, 'beamngEarth_expeditions') or (extensions and extensions.beamngEarth_expeditions)
+  if not exp then pcall(function() exp = require('beamngEarth/expeditions') end) end
+  local hb = exp and exp.getHomeBase and exp.getHomeBase()
+  if hb and lat and lon then
+    if places.distance(lat, lon, hb.lat, hb.lon) <= 300 then
+      isAtBase = true
+    end
+  end
+
+  local isNearTown = isAtBase
+  if not isNearTown and lat and lon then
+    local nearestHub, hubDist = M.findNearestHub(lat, lon)
+    if nearestHub and hubDist <= 2500 then
+      isNearTown = true
+    end
+  end
+
+  local pricePerLiter = 1.85
+  if isAtBase and M.hasUpgrade and M.hasUpgrade('garage_bulk_fuel') then
+    pricePerLiter = 1.10 -- 40% wholesale discount
+  end
+
+  local litersNeeded = math.max(0, driverStatus.tankCapacityLiters - driverStatus.fuelLiters)
+  local refillCost = math.floor(litersNeeded * pricePerLiter)
+
+  return {
+    fatiguePercent = math.floor(driverStatus.fatiguePercent + 0.5),
+    fuelPercent = math.floor(driverStatus.fuelPercent + 0.5),
+    fuelLiters = math.floor(driverStatus.fuelLiters + 0.5),
+    tankCapacity = driverStatus.tankCapacityLiters,
+    isAtBase = isAtBase,
+    isNearTown = isNearTown,
+    pricePerLiter = pricePerLiter,
+    refillCost = refillCost,
+    canRest = true,
+    canRefuel = (isNearTown or isAtBase) and (litersNeeded >= 5)
+  }
+end
+
+-- Refuel truck at station or Home Base
+function M.refuelVehicle(lat, lon)
+  local status = M.getDriverStatus(lat, lon)
+  if not status.canRefuel then
+    return false, 'Must be near a town or Home Base with at least 5L fuel deficit'
+  end
+
+  local comp = companyState.company
+  if (comp.vault or 0) < status.refillCost then
+    return false, string.format("Insufficient company funds ($%d needed)", status.refillCost)
+  end
+
+  comp.vault = comp.vault - status.refillCost
+  driverStatus.fuelLiters = driverStatus.tankCapacityLiters
+  driverStatus.fuelPercent = 100.0
+  M.saveState()
+
+  -- Send refuel command to BeamNG vehicle if present
+  local pVeh = rawget(_G, 'getPlayerVehicle') and getPlayerVehicle(0)
+  if pVeh then
+    pVeh:queueLuaCommand("if energyStorage then for _, s in pairs(energyStorage.getStorages()) do if s.type == 'fuelTank' then s:setRemainingRatio(1.0) end end end")
+  end
+
+  broadcastLogistics({
+    type = 'refuel',
+    cost = status.refillCost,
+    company = comp
+  })
+
+  if rawget(_G, 'ui_message') then
+    pcall(ui_message, string.format("⛽ TANK REFUELED! Refilled to 100%% for $%d.", status.refillCost), 6, 'beamngEarthFreight')
+  end
+
+  return true, status.refillCost
+end
+
+-- Rest / sleep to eliminate driver fatigue and advance time of day
+function M.restDriver(hours)
+  hours = hours or 8
+  local pVeh = rawget(_G, 'getPlayerVehicle') and getPlayerVehicle(0)
+  local speed = pVeh and pVeh.getVelocity and pVeh:getVelocity():length() or 0
+  if speed >= 1.0 then
+    return false, 'Vehicle must be stopped to rest'
+  end
+
+  driverStatus.fatiguePercent = 0.0
+
+  -- Advance BeamNG TimeOfDay
+  local scenetree = rawget(_G, 'scenetree')
+  local names = scenetree and scenetree.findClassObjects and scenetree.findClassObjects('TimeOfDay')
+  local tod = names and names[1] and scenetree.findObject(names[1])
+  if tod then
+    local currentT = tonumber(tod.time) or 0
+    tod.time = (currentT + hours / 24) % 1.0
+  end
+
+  if rawget(_G, 'ui_message') then
+    pcall(ui_message, string.format("💤 REST COMPLETED: Slept for %d hours. Driver refreshed!", hours), 6, 'beamngEarthFreight')
+  end
+
+  return true, hours
+end
+
 function M.getVehicleDamage(veh)
   if not veh then return 0 end
   local id = veh:getID()
@@ -757,6 +871,35 @@ function M.update(playerLat, playerLon, playerVeh)
       end
     end
   end
+
+  -- Fuel consumption and driver fatigue simulation (every 2s)
+  if now - driverStatus.lastCheckTime >= 2.0 then
+    local dt = (driverStatus.lastCheckTime > 0) and (now - driverStatus.lastCheckTime) or 2.0
+    driverStatus.lastCheckTime = now
+
+    local speed = playerVeh and playerVeh.getVelocity and playerVeh:getVelocity():length() or 0
+    if speed > 2.0 then
+      -- Driving: accumulate fatigue (~1% per 30s of highway driving)
+      driverStatus.fatiguePercent = math.min(100.0, driverStatus.fatiguePercent + (dt / 30.0))
+
+      -- Fuel consumption based on speed and load
+      local kmDriven = (speed * dt) / 1000.0
+      local ratePerKm = 0.38 -- ~38 L/100km for commercial heavy semi
+      local litersBurned = kmDriven * ratePerKm
+      driverStatus.fuelLiters = math.max(0, driverStatus.fuelLiters - litersBurned)
+      driverStatus.fuelPercent = (driverStatus.fuelLiters / driverStatus.tankCapacityLiters) * 100.0
+
+      -- Fatigue warning toast
+      if driverStatus.fatiguePercent >= 85 and not driverStatus.fatigueWarned then
+        driverStatus.fatigueWarned = true
+        if rawget(_G, 'ui_message') then
+          pcall(ui_message, "⚠️ DRIVER FATIGUE CRITICAL (85%): Pull over at a rest stop or Home Base to sleep!", 8, 'beamngEarthFreight')
+        end
+      elseif driverStatus.fatiguePercent < 80 then
+        driverStatus.fatigueWarned = false
+      end
+    end
+  end
 end
 
 -- UI State representation for HUD and menus
@@ -773,6 +916,7 @@ function M.getUiState(playerLat, playerLon)
     availableJobs = available,
     canDeliver = c and c.currentDistanceM and c.currentDistanceM <= 40,
     precisionDockCompleted = c and c.precisionDockCompleted == true,
+    driverStatus = M.getDriverStatus(playerLat, playerLon),
     upgrades = M.getUpgradesList()
   }
 end
@@ -913,6 +1057,20 @@ end
 -- Reset session
 function M.reset()
   companyState.activeContract = nil
+  driverStatus.fatiguePercent = 0.0
+  driverStatus.fuelPercent = 100.0
+  driverStatus.fuelLiters = driverStatus.tankCapacityLiters
+  driverStatus.lastCheckTime = 0
+  driverStatus.fatigueWarned = false
+end
+
+function M._setDriverStatus(t)
+  if type(t) == 'table' then
+    if t.fatiguePercent ~= nil then driverStatus.fatiguePercent = t.fatiguePercent end
+    if t.fuelPercent ~= nil then driverStatus.fuelPercent = t.fuelPercent end
+    if t.fuelLiters ~= nil then driverStatus.fuelLiters = t.fuelLiters end
+    if t.tankCapacityLiters ~= nil then driverStatus.tankCapacityLiters = t.tankCapacityLiters end
+  end
 end
 
 return M

@@ -246,6 +246,13 @@ function G.onLogistics(pid, msg, playerName)
     return { type = 'finalize', jobId = msg.jobId, company = comp, netPayout = payout, playerName = playerName }, -1
   end
 
+  if msg.type == 'refuel' then
+    local cost = tonumber(msg.cost) or 0
+    local comp = G.logistics.company
+    comp.vault = math.max(0, (comp.vault or 0) - cost)
+    return { type = 'refuel', cost = cost, company = comp, playerName = playerName }, -1
+  end
+
   if msg.type == 'abandon' then
     G.logistics.activeContract = nil
     return { type = 'abandon', jobId = msg.jobId, playerName = playerName }, -1

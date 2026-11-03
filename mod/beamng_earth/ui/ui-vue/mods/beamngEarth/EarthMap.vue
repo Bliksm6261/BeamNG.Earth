@@ -480,6 +480,59 @@
 
           <!-- TAB 3: TRUCKING & LOGISTICS -->
           <div v-else-if="hqTab === 'freight'" class="freight-tab-content">
+            <!-- Driver Status & Operations Card -->
+            <div v-if="freightData.driverStatus" class="driver-ops-card">
+              <div class="driver-ops-header">
+                <span class="ops-title">🚛 Driver Status & Field Operations</span>
+                <span class="ops-loc-badge" :class="{ 'at-base': freightData.driverStatus.isAtBase }">
+                  {{ freightData.driverStatus.isAtBase ? '🏠 At Home Base HQ' : (freightData.driverStatus.isNearTown ? '🏙️ Near Rest Stop / Town' : '🛣️ Out on the Road') }}
+                </span>
+              </div>
+              <div class="driver-meters-grid">
+                <div class="meter-box">
+                  <div class="meter-label-row">
+                    <span>⛽ Fuel Tank</span>
+                    <strong :style="{ color: freightData.driverStatus.fuelPercent > 25 ? '#28a745' : '#dc3545' }">
+                      {{ freightData.driverStatus.fuelPercent }}% ({{ freightData.driverStatus.fuelLiters }} / {{ freightData.driverStatus.tankCapacity }} L)
+                    </strong>
+                  </div>
+                  <div class="meter-track">
+                    <div class="meter-fill fuel" :style="{ width: freightData.driverStatus.fuelPercent + '%' }"></div>
+                  </div>
+                </div>
+                <div class="meter-box">
+                  <div class="meter-label-row">
+                    <span>💤 Driver Fatigue</span>
+                    <strong :style="{ color: freightData.driverStatus.fatiguePercent < 75 ? '#28a745' : '#dc3545' }">
+                      {{ freightData.driverStatus.fatiguePercent }}%
+                    </strong>
+                  </div>
+                  <div class="meter-track">
+                    <div class="meter-fill fatigue" :style="{ width: freightData.driverStatus.fatiguePercent + '%' }"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="driver-ops-actions">
+                <button
+                  class="map-btn small primary"
+                  :disabled="!freightData.driverStatus.canRefuel"
+                  :class="{ disabled: !freightData.driverStatus.canRefuel }"
+                  @click="refuelTruck"
+                  :title="freightData.driverStatus.canRefuel ? 'Refuel diesel tank to 100%' : 'Must be near town or Home Base with fuel deficit'"
+                >
+                  ⛽ Refuel Tank (${{ freightData.driverStatus.refillCost.toLocaleString() }})
+                  <span v-if="freightData.driverStatus.isAtBase && freightData.driverStatus.pricePerLiter < 1.5" class="discount-badge">-40% Bulk</span>
+                </button>
+                <button
+                  class="map-btn small"
+                  @click="restDriver(8)"
+                  title="Rest for 8 hours to eliminate fatigue and advance time of day"
+                >
+                  💤 Rest (8 Hours)
+                </button>
+              </div>
+            </div>
+
             <!-- Active Contract in Progress -->
             <div v-if="freightData.activeContract && freightData.activeContract.status === 'in_transit'" class="active-contract-card">
               <div class="active-header">
@@ -833,6 +886,18 @@ function abandonContract() {
 
 function spawnTrailer() {
   engineLua('beamngEarth_settings.uiFreightSpawnTrailer()', () => {
+    pollFreight()
+  })
+}
+
+function refuelTruck() {
+  engineLua('beamngEarth_settings.uiFreightRefuel()', () => {
+    pollFreight()
+  })
+}
+
+function restDriver(hours) {
+  engineLua(`beamngEarth_settings.uiFreightRest(${hours || 8})`, () => {
     pollFreight()
   })
 }
@@ -2128,4 +2193,22 @@ const fmtLatLon = mm.fmtLatLon
   background: rgba(40, 167, 69, 0.2); border: 1px solid rgba(40, 167, 69, 0.5); border-radius: 4px;
   color: #28a745; font-size: 12px; font-weight: 700; padding: 4px 8px; text-align: center;
 }
+
+.driver-ops-card {
+  background: rgba(18, 22, 30, 0.85); border: 1px solid rgba(255, 149, 0, 0.35); border-radius: 6px;
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;
+}
+.driver-ops-header { display: flex; align-items: center; justify-content: space-between; }
+.ops-title { font-size: 13px; font-weight: 700; color: #fff; }
+.ops-loc-badge { font-size: 11px; font-weight: 600; color: #9aa4ae; background: rgba(255, 255, 255, 0.08); padding: 2px 8px; border-radius: 4px; }
+.ops-loc-badge.at-base { color: #28a745; background: rgba(40, 167, 69, 0.18); border: 1px solid rgba(40, 167, 69, 0.35); }
+.driver-meters-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.meter-box { display: flex; flex-direction: column; gap: 4px; }
+.meter-label-row { display: flex; justify-content: space-between; font-size: 11px; color: #c0c8d4; }
+.meter-track { height: 7px; background: rgba(255, 255, 255, 0.1); border-radius: 4px; overflow: hidden; }
+.meter-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
+.meter-fill.fuel { background: linear-gradient(90deg, #ff9500, #28a745); }
+.meter-fill.fatigue { background: linear-gradient(90deg, #28a745, #dc3545); }
+.driver-ops-actions { display: flex; gap: 10px; align-items: center; }
+.discount-badge { background: #28a745; color: #fff; font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 3px; margin-left: 4px; }
 </style>
