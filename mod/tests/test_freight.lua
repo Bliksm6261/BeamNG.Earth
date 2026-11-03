@@ -303,4 +303,51 @@ do
   T.check(freight.hasUpgrade('license_reefer'), 'remote purchase_upgrade synced to local fleet')
 end
 
+--------------------------------------------------------------------------------
+-- 8. Precision Reverse Docking Bonus
+--------------------------------------------------------------------------------
+do
+  freight.reset()
+  local comp = freight.getCompany()
+  local startVault = comp.vault
+  local startRep = comp.reputation
+
+  local soloJob = {
+    id = '#DK-101',
+    origin = { name = 'Joburg Hub', lat = -26.2, lon = 28.0 },
+    destination = { name = 'Pretoria Depot', lat = -25.7, lon = 28.2 },
+    cargo = { name = 'Packaged Merchandise', category = 'dry', fragile = false, hazmat = false },
+    trucksRequired = 1,
+    weightPerTruckKg = 15000,
+    totalWeightKg = 15000,
+    distanceKm = 60,
+    totalPayout = 10000,
+    payoutPerTruck = 10000,
+    slots = {
+      {
+        slot = 1,
+        weightKg = 15000,
+        claimedBy = 'ProDriver',
+        status = 'open',
+        cargoHealth = 100,
+        damagePenalty = 0,
+        grossPayout = 10000
+      }
+    },
+    status = 'available'
+  }
+
+  local ok = freight.acceptContract(soloJob, 1, 'ProDriver', 1)
+  T.check(ok, 'accepted solo job for docking test')
+
+  -- Deliver with precision reverse docking = true
+  local delOk, manifest = freight.deliverSlot(1, true)
+  T.check(delOk, 'delivered slot with precision dock')
+  T.check(type(manifest) == 'table', 'finalized contract manifest returned')
+  T.check(manifest.dockBonus == 2000, 'awarded 20% precision docking bonus ($2,000 on $10,000 gross)')
+  T.check(manifest.netPayout == 12000, 'net payout includes gross + 20% dock bonus ($12,000)')
+  T.check(comp.vault == startVault + 12000, 'company vault received gross + precision bonus')
+  T.check(comp.reputation >= startRep + 7, 'reputation rewarded with extra precision skill bonus (+7)')
+end
+
 T.done('test_freight')

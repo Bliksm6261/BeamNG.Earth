@@ -552,11 +552,21 @@ function M.recordDamage(slotIndex, damagePercent)
 end
 
 -- Complete delivery for a slot
-function M.deliverSlot(slotIndex)
+function M.deliverSlot(slotIndex, precisionDock)
   local c = companyState.activeContract
   if not c or not c.slots[slotIndex] then return false end
   local slot = c.slots[slotIndex]
   slot.status = 'delivered'
+
+  local isDock = (precisionDock == true) or (c.precisionDockCompleted == true)
+  slot.precisionDock = isDock
+  if isDock then
+    slot.dockBonus = math.floor(slot.grossPayout * 0.20)
+    slot.grossPayout = slot.grossPayout + slot.dockBonus
+  else
+    slot.dockBonus = 0
+  end
+
   slot.damagePenalty = M.calculatePenalty(slot, c.cargo)
 
   broadcastLogistics({
@@ -564,7 +574,9 @@ function M.deliverSlot(slotIndex)
     jobId = c.id,
     slotIndex = slotIndex,
     cargoHealth = slot.cargoHealth,
-    damagePenalty = slot.damagePenalty
+    damagePenalty = slot.damagePenalty,
+    precisionDock = slot.precisionDock,
+    dockBonus = slot.dockBonus
   })
 
   -- Check if all claimed slots are delivered
@@ -591,6 +603,7 @@ function M.finalizeContract()
 
   local grossEarnings = 0
   local totalPenalties = 0
+  local totalDockBonus = 0
   local deliveredWeightKg = 0
 
   for _, s in ipairs(c.slots) do
@@ -598,6 +611,7 @@ function M.finalizeContract()
       grossEarnings = grossEarnings + s.grossPayout
       local pen = M.calculatePenalty(s, c.cargo)
       totalPenalties = totalPenalties + pen
+      totalDockBonus = totalDockBonus + (s.dockBonus or 0)
       deliveredWeightKg = deliveredWeightKg + s.weightKg
     end
   end
@@ -611,13 +625,16 @@ function M.finalizeContract()
   comp.completedDeliveries = comp.completedDeliveries + 1
   comp.totalTonnesHauled = comp.totalTonnesHauled + math.floor(deliveredWeightKg / 1000)
 
-  -- Reputation adjustment based on penalties
+  -- Reputation adjustment based on penalties and precision reverse docking
   local repGain = 2
+  if totalDockBonus > 0 then
+    repGain = repGain + 5 -- Precision Docking skill bonus!
+  end
   if totalPenalties > (grossEarnings * 0.3) then
     repGain = -5
     comp.reputation = math.max(10, comp.reputation - 5)
   else
-    comp.reputation = math.min(100, comp.reputation + 2)
+    comp.reputation = math.min(100, comp.reputation + repGain)
   end
 
   local manifest = {
@@ -627,6 +644,7 @@ function M.finalizeContract()
     cargo = c.cargo.name,
     grossEarnings = grossEarnings,
     totalPenalties = totalPenalties,
+    dockBonus = totalDockBonus,
     netPayout = netPayout,
     companyVault = comp.vault,
     reputation = comp.reputation
@@ -710,10 +728,31 @@ function M.update(playerLat, playerLon, playerVeh)
 
     if distM <= 40 then
       local speed = playerVeh and playerVeh.getVelocity and playerVeh:getVelocity():length() or 0
+
+      -- Detect trailer uncoupling inside depot loading bay
+      if playerVeh then
+        local vehId = playerVeh:getID()
+        local tr = rawget(_G, 'core_trailerRespawn')
+        local getC = tr and (tr.getCouplingDetails or tr.getCouplings)
+        local cMap = getC and pcall(getC) and getC()
+        local coupledNow = type(cMap) == 'table' and cMap[vehId] and cMap[vehId].trailerId ~= nil
+
+        if c.wasCoupledOnArrival == nil then
+          c.wasCoupledOnArrival = coupledNow
+        elseif c.wasCoupledOnArrival and not coupledNow and speed < 0.5 then
+          if not c.precisionDockCompleted then
+            c.precisionDockCompleted = true
+            if rawget(_G, 'ui_message') then
+              pcall(ui_message, "🅿️ PRECISION DOCK COMPLETE! Trailer uncoupled in loading bay (+20% Payout Bonus).", 8, 'beamngEarthFreight')
+            end
+          end
+        end
+      end
+
       if speed < 1.0 and not c.canDeliverPrompted then
         c.canDeliverPrompted = true
         if rawget(_G, 'ui_message') then
-          pcall(ui_message, string.format("Destination reached: %s. Stop and complete delivery in the logistics menu.", c.destination.name), 8, 'beamngEarthFreight')
+          pcall(ui_message, string.format("Destination reached: %s. Standard drop-off or precision dock in logistics menu.", c.destination.name), 8, 'beamngEarthFreight')
         end
       end
     end
@@ -733,6 +772,7 @@ function M.getUiState(playerLat, playerLon)
     activeContract = c,
     availableJobs = available,
     canDeliver = c and c.currentDistanceM and c.currentDistanceM <= 40,
+    precisionDockCompleted = c and c.precisionDockCompleted == true,
     upgrades = M.getUpgradesList()
   }
 end

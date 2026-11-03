@@ -571,9 +571,9 @@ function M.uiFreightClaim(slotIndex)
   return { ok = ok, slot = res }
 end
 
-function M.uiFreightDeliver(slotIndex)
+function M.uiFreightDeliver(slotIndex, precisionDock)
   local freight = require('beamngEarth/freight')
-  local ok, res = freight.deliverSlot(slotIndex or 1)
+  local ok, res = freight.deliverSlot(slotIndex or 1, precisionDock == true)
   return { ok = ok, manifest = res }
 end
 

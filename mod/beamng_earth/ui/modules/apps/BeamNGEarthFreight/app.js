@@ -18,7 +18,7 @@ angular.module('beamng.apps')
             '<span style="color:#FFB54A;font-weight:bold;">${{ payout }}</span>' +
           '</div>' +
           '<div ng-show="arrived" style="margin-top:4px;background:#28a745;color:#fff;text-align:center;padding:3px;border-radius:3px;font-weight:bold;font-size:12px;animation:pulse 1.5s infinite;">' +
-            '🎯 DESTINATION REACHED — OPEN LOGISTICS (M) TO DELIVER' +
+            '🎯 DESTINATION REACHED — DROP OFF OR DOCK FOR +20% BONUS' +
           '</div>' +
         '</div>' +
         '<div ng-show="!active && company && !hidden" style="background:rgba(12,15,20,0.65);border-left:4px solid #6c757d;border-radius:4px;padding:4px 10px;color:#c0c8d4;font-size:12px;">' +

@@ -513,9 +513,19 @@
 
               <div class="contract-actions">
                 <button class="map-btn small" @click="spawnTrailer" title="Spawn the matching trailer behind your truck">🚚 Spawn Trailer</button>
-                <button v-if="freightData.canDeliver" class="map-btn primary deliver-btn" @click="deliverContract">
-                  ✓ Complete Delivery &amp; Collect Payment
-                </button>
+                <div v-if="freightData.canDeliver" class="deliver-actions-group">
+                  <div v-if="freightData.precisionDockCompleted" class="precision-completed-badge">
+                    🅿️ Precision reverse docking detected! (+20% bonus ready)
+                  </div>
+                  <div class="deliver-btns-row">
+                    <button class="map-btn primary deliver-btn" @click="deliverContract(false)">
+                      ✓ Standard Drop-off
+                    </button>
+                    <button class="map-btn highlight precision-btn" @click="deliverContract(true)" title="Reverse into loading bay and uncouple trailer for +20% bonus">
+                      🅿️ Precision Reverse Dock (+20% Bonus: +${{ Math.round(freightData.activeContract.slots[0].grossPayout * 0.20).toLocaleString() }})
+                    </button>
+                  </div>
+                </div>
                 <div v-else class="in-transit-hint">
                   Drive within 40m of {{ freightData.activeContract.destination.name }} to complete delivery.
                 </div>
@@ -809,8 +819,8 @@ function acceptJob(jobId) {
   })
 }
 
-function deliverContract() {
-  engineLua('beamngEarth_settings.uiFreightDeliver(1)', () => {
+function deliverContract(precision) {
+  engineLua(`beamngEarth_settings.uiFreightDeliver(1, ${precision ? 'true' : 'false'})`, () => {
     pollFreight()
   })
 }
@@ -2105,4 +2115,17 @@ const fmtLatLon = mm.fmtLatLon
 .owned-indicator { font-size: 11px; color: #28a745; font-weight: 600; text-align: center; padding: 4px 0; }
 .job-lock-hint { font-size: 11px; color: #e07a5f; margin-top: 4px; font-weight: 600; }
 .map-btn.disabled { opacity: 0.5; cursor: not-allowed; background: rgba(255, 255, 255, 0.08); color: #888; }
+
+.deliver-actions-group { display: flex; flex-direction: column; gap: 6px; }
+.deliver-btns-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.map-btn.highlight.precision-btn {
+  background: #ff9500; color: #111; font-weight: 700; border: none;
+}
+.map-btn.highlight.precision-btn:hover {
+  background: #ffaa33; box-shadow: 0 0 12px rgba(255, 149, 0, 0.6);
+}
+.precision-completed-badge {
+  background: rgba(40, 167, 69, 0.2); border: 1px solid rgba(40, 167, 69, 0.5); border-radius: 4px;
+  color: #28a745; font-size: 12px; font-weight: 700; padding: 4px 8px; text-align: center;
+}
 </style>
