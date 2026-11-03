@@ -620,6 +620,23 @@ function M.uiFreightRest(hours)
   return { ok = ok, result = res }
 end
 
+function M.uiCheckpointClear(checkpointId)
+  local core = ext('beamngEarth_core')
+  local st = core and core._state and core._state() or nil
+  local pl = st and st.player
+  local checkpoints = require('beamngEarth/checkpoints')
+  local ok, res = checkpoints.clearCheckpoint(checkpointId, pl and pl.lat, pl and pl.lon)
+  return { ok = ok, result = res }
+end
+
+function M.uiCheckpointState()
+  local core = ext('beamngEarth_core')
+  local st = core and core._state and core._state() or nil
+  local pl = st and st.player
+  local checkpoints = require('beamngEarth/checkpoints')
+  return checkpoints.getUiState(pl and pl.lat, pl and pl.lon)
+end
+
 -- Overlanding Expeditions & Home Base UI Bridge
 function M.uiExpeditionState()
   local core = ext('beamngEarth_core')

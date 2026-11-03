@@ -31,6 +31,12 @@ angular.module('beamng.apps')
             '<span ng-show="hasDriverStatus" style="font-size:11px;color:#a0aab8;">⛽ {{ fuelPercent }}% &middot; 💤 {{ fatiguePercent }}%</span>' +
           '</div>' +
         '</div>' +
+        '<div ng-show="checkpoint && !hidden" style="margin-top:4px;background:rgba(18,24,34,0.92);border-left:4px solid #38a169;border-radius:4px;padding:4px 10px;color:#f0f2f5;font-size:11px;">' +
+          '<div layout="row" layout-align="space-between center">' +
+            '<span>{{ cpIcon }} <strong>{{ cpName }}</strong></span>' +
+            '<span style="color:#FFB54A;font-weight:bold;">{{ cpDist }}m</span>' +
+          '</div>' +
+        '</div>' +
       '</div>',
     replace: true,
     link: function (scope) {
@@ -51,6 +57,10 @@ angular.module('beamng.apps')
       scope.fatiguePercent = 0
       scope.fuelStyle = { color: '#28a745' }
       scope.fatigueStyle = { color: '#28a745' }
+      scope.checkpoint = false
+      scope.cpName = ''
+      scope.cpIcon = ''
+      scope.cpDist = ''
 
       var hello = function (on) {
         bngApi.engineLua('if beamngEarth_core and beamngEarth_core.hudApp then beamngEarth_core.hudApp("freight", ' + on + ') end')
@@ -72,6 +82,14 @@ angular.module('beamng.apps')
             scope.fatiguePercent = fr.driverStatus.fatiguePercent != null ? fr.driverStatus.fatiguePercent : 0
             scope.fuelStyle = { color: scope.fuelPercent > 25 ? '#28a745' : '#dc3545' }
             scope.fatigueStyle = { color: scope.fatiguePercent < 75 ? '#28a745' : '#dc3545' }
+          }
+          if (fr.checkpoints && fr.checkpoints.nearby && fr.checkpoints.nearby.distanceM <= 150) {
+            scope.checkpoint = true
+            scope.cpName = fr.checkpoints.nearby.name
+            scope.cpIcon = fr.checkpoints.nearby.icon || '🛂'
+            scope.cpDist = fr.checkpoints.nearby.distanceM
+          } else {
+            scope.checkpoint = false
           }
           var c = fr.activeContract
           if (c && c.status === 'in_transit') {

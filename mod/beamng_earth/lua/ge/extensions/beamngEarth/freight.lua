@@ -7,6 +7,7 @@ local M = {}
 
 local places = require('beamngEarth/places')
 local gps = require('beamngEarth/gps')
+local checkpoints = require('beamngEarth/checkpoints')
 
 M.FILE = '/settings/beamngEarth_logistics.json'
 M.VERSION = 1
@@ -900,6 +901,11 @@ function M.update(playerLat, playerLon, playerVeh)
       end
     end
   end
+
+  -- Regional checkpoints (toll plazas, border posts, weigh stations)
+  if checkpoints and checkpoints.update then
+    checkpoints.update(playerLat, playerLon, playerVeh)
+  end
 end
 
 -- UI State representation for HUD and menus
@@ -917,7 +923,8 @@ function M.getUiState(playerLat, playerLon)
     canDeliver = c and c.currentDistanceM and c.currentDistanceM <= 40,
     precisionDockCompleted = c and c.precisionDockCompleted == true,
     driverStatus = M.getDriverStatus(playerLat, playerLon),
-    upgrades = M.getUpgradesList()
+    upgrades = M.getUpgradesList(),
+    checkpoints = checkpoints and checkpoints.getUiState and checkpoints.getUiState(playerLat, playerLon)
   }
 end
 
@@ -1062,6 +1069,14 @@ function M.reset()
   driverStatus.fuelLiters = driverStatus.tankCapacityLiters
   driverStatus.lastCheckTime = 0
   driverStatus.fatigueWarned = false
+  if checkpoints and checkpoints.reset then checkpoints.reset() end
+end
+
+function M.clearCheckpoint(cpId, playerLat, playerLon)
+  if checkpoints and checkpoints.clearCheckpoint then
+    return checkpoints.clearCheckpoint(cpId, playerLat, playerLon)
+  end
+  return false, 'Checkpoints module not loaded'
 end
 
 function M._setDriverStatus(t)

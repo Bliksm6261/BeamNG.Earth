@@ -253,6 +253,26 @@ function G.onLogistics(pid, msg, playerName)
     return { type = 'refuel', cost = cost, company = comp, playerName = playerName }, -1
   end
 
+  if msg.type == 'checkpoint_clear' then
+    local fee = tonumber(msg.fee) or 0
+    local fine = tonumber(msg.fine) or 0
+    local totalDeduction = fee + fine
+    local comp = G.logistics.company
+    if totalDeduction > 0 then
+      comp.vault = math.max(0, (comp.vault or 0) - totalDeduction)
+    end
+    return {
+      type = 'checkpoint_clear',
+      checkpointId = msg.checkpointId,
+      checkpointType = msg.checkpointType,
+      name = msg.name,
+      fee = fee,
+      fine = fine,
+      company = comp,
+      playerName = playerName
+    }, -1
+  end
+
   if msg.type == 'abandon' then
     G.logistics.activeContract = nil
     return { type = 'abandon', jobId = msg.jobId, playerName = playerName }, -1

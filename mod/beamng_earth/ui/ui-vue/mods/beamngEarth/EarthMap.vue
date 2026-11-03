@@ -533,6 +533,38 @@
               </div>
             </div>
 
+            <!-- Nearby Checkpoint Banner (Toll / Border / Weigh Station) -->
+            <div v-if="freightData.checkpoints && freightData.checkpoints.nearby" class="checkpoint-banner" :class="freightData.checkpoints.nearby.type">
+              <div class="cp-left">
+                <span class="cp-icon">{{ freightData.checkpoints.nearby.icon }}</span>
+                <div class="cp-info">
+                  <div class="cp-title-row">
+                    <span class="cp-name">{{ freightData.checkpoints.nearby.name }}</span>
+                    <span class="cp-dist-tag">{{ freightData.checkpoints.nearby.distanceM }}m ahead</span>
+                  </div>
+                  <div class="cp-desc">
+                    {{ freightData.checkpoints.nearby.corridor }} &middot;
+                    <span v-if="freightData.checkpoints.nearby.type === 'toll'">Heavy Vehicle Toll: ${{ freightData.checkpoints.nearby.fee }}</span>
+                    <span v-else-if="freightData.checkpoints.nearby.type === 'border'">Customs & Transit: {{ freightData.checkpoints.nearby.countryA }} ➔ {{ freightData.checkpoints.nearby.countryB }}</span>
+                    <span v-else-if="freightData.checkpoints.nearby.type === 'weigh'">Axle Weight Enforcement (Max 34,000 kg)</span>
+                  </div>
+                </div>
+              </div>
+              <div class="cp-actions">
+                <button
+                  class="map-btn small highlight"
+                  :disabled="!freightData.checkpoints.nearby.canClear"
+                  :class="{ disabled: !freightData.checkpoints.nearby.canClear }"
+                  @click="clearCheckpoint(freightData.checkpoints.nearby.id)"
+                  :title="freightData.checkpoints.nearby.canClear ? 'Clear checkpoint lane' : 'Slow down and pull into lane (<35m)'"
+                >
+                  <span v-if="freightData.checkpoints.nearby.type === 'toll'">💳 Pay & Open Gate</span>
+                  <span v-else-if="freightData.checkpoints.nearby.type === 'border'">🛂 Customs Clearance</span>
+                  <span v-else-if="freightData.checkpoints.nearby.type === 'weigh'">⚖️ Weigh-In Scales</span>
+                </button>
+              </div>
+            </div>
+
             <!-- Active Contract in Progress -->
             <div v-if="freightData.activeContract && freightData.activeContract.status === 'in_transit'" class="active-contract-card">
               <div class="active-header">
@@ -898,6 +930,12 @@ function refuelTruck() {
 
 function restDriver(hours) {
   engineLua(`beamngEarth_settings.uiFreightRest(${hours || 8})`, () => {
+    pollFreight()
+  })
+}
+
+function clearCheckpoint(cpId) {
+  engineLua(`beamngEarth_settings.uiCheckpointClear(${luaStr(cpId)})`, () => {
     pollFreight()
   })
 }
@@ -2211,4 +2249,19 @@ const fmtLatLon = mm.fmtLatLon
 .meter-fill.fatigue { background: linear-gradient(90deg, #28a745, #dc3545); }
 .driver-ops-actions { display: flex; gap: 10px; align-items: center; }
 .discount-badge { background: #28a745; color: #fff; font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 3px; margin-left: 4px; }
+
+.checkpoint-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: rgba(18, 24, 34, 0.95); border: 1px solid rgba(255, 149, 0, 0.4); border-radius: 6px;
+  padding: 10px 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+}
+.checkpoint-banner.border { border-color: rgba(56, 161, 105, 0.6); }
+.checkpoint-banner.weigh { border-color: rgba(224, 122, 95, 0.6); }
+.cp-left { display: flex; align-items: center; gap: 12px; }
+.cp-icon { font-size: 24px; }
+.cp-info { display: flex; flex-direction: column; gap: 2px; }
+.cp-title-row { display: flex; align-items: center; gap: 8px; }
+.cp-name { font-size: 14px; font-weight: 700; color: #fff; }
+.cp-dist-tag { font-size: 11px; font-weight: 600; color: #ffb54a; background: rgba(255, 149, 0, 0.15); padding: 1px 6px; border-radius: 3px; }
+.cp-desc { font-size: 12px; color: #a0aab8; }
 </style>
