@@ -118,7 +118,7 @@ MOD_TO_SERVER = {
     "perf_log": {"lines": F((list, dict))},
     # BeamMP shared generation (peerwork.py, mpsession.lua): our world server serves our group; the players on our
     # anchor ({id, host, port, code, weight} each)
-    "share": {},
+    "share": {"port": F(int, OPT)},
     "peers": {"me": F(str), "members": F(list)},
     # roads (roads.py; additive): the mod removed its roads (switched off and on again): send them again
     "roads_reset": {},
@@ -304,6 +304,15 @@ def mod_sends():
             keys, nested = top_keys(t)
             kind = re.search(r"type\s*=\s*'(\w+)'", t).group(1)
             out.setdefault(kind, []).append((keys - {"type"}, nested))
+    # mpsession builds this request in a pure helper, then passes it to net.send.
+    text = (LUA / "mpsession.lua").read_text(encoding="utf-8")
+    if not re.search(r"net'\)\.send\(M\.shareRequest\(config\)\)", text):
+        raise ValueError("shareRequest is no longer sent: update the constructor scan")
+    body = lua_function(text, "shareRequest")
+    t = lua_tables(body, body.index("{"))
+    keys, nested = top_keys(t)
+    kind = re.search(r"type\s*=\s*'(\w+)'", t).group(1)
+    out.setdefault(kind, []).append((keys - {"type"}, nested))
     return out
 
 
