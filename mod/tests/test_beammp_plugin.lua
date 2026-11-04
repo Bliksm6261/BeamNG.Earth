@@ -7,6 +7,28 @@ OTBT_LEDGER_PATH = os.tmpname()
 os.remove(OTBT_LEDGER_PATH)
 local G = dofile(dir .. '/../../beammp/Server/BeamNGEarth/main.lua')
 
+-- Preserve the first path character and the directory separator in either source format.
+for _, case in ipairs({
+  { '@/abs/path/main.lua', '/abs/path/' },
+  { '@Resources/Server/BeamNGEarth/main.lua', 'Resources/Server/BeamNGEarth/' },
+  { 'Resources/Server/BeamNGEarth/main.lua', 'Resources/Server/BeamNGEarth/' },
+  { '@C:\\Resources\\main.lua', 'C:\\Resources\\' },
+  { '@main.lua', './' },
+  { 'main.lua', './' },
+}) do
+  T.check(G.pluginDirectory(case[1]) == case[2], 'plugin directory: ' .. case[1])
+end
+
+-- Execute the whole plugin with both chunk source formats; real dofile calls must find its lib modules.
+local pluginPath = dir .. '/../../beammp/Server/BeamNGEarth/main.lua'
+local file = assert(io.open(pluginPath, 'r'))
+local source = file:read('*a')
+file:close()
+for _, prefix in ipairs({ '@', '' }) do
+  local plugin = assert(loadstring(source, prefix .. pluginPath))()
+  T.check(type(plugin.syncState) == 'function', 'lib modules loaded for source prefix: ' .. prefix)
+end
+
 local M_PER_DEG = 111194.9     -- (G.dist's sphere)
 
 T.check(math.abs(G.dist(0, 0, 1000 / M_PER_DEG, 0) - 1000) < 1, 'dist: 1 km north')

@@ -153,7 +153,12 @@ function G.config()
 end
 
 -- Modules are loaded relative to this plugin, independent of the server working directory.
-local pluginDir = debug.getinfo(1, 'S').source:sub(2):match('^(.*[/\\])') or './'
+-- BeamMP 3.9.3 may report a plain relative source instead of Lua's @-prefixed filename.
+function G.pluginDirectory(source)
+  source = source:gsub('^@', '')
+  return source:match('^(.*[/\\])') or './'
+end
+local pluginDir = G.pluginDirectory(debug.getinfo(1, 'S').source)
 G.LEDGER_PATH = rawget(_G, 'OTBT_LEDGER_PATH') or (pluginDir .. 'data/otbt_ledger.json')
 dofile(pluginDir .. 'lib/otbt_ledger.lua')(G, dofile(pluginDir .. 'lib/otbt_economy.lua'), dofile(pluginDir .. 'lib/otbt_json.lua'))
 
