@@ -53,11 +53,25 @@ end
 --------------------------------------------------------------------------------
 do
   local appliedImpulse = false
+  local impulse = nil
+  local vec3Mt = {
+    __mul = function(v, scale)
+      return vec3(v.x * scale, v.y * scale, v.z * scale)
+    end
+  }
+  function vec3(x, y, z)
+    return setmetatable({ x = x, y = y, z = z }, vec3Mt)
+  end
+  -- Identity rotation preserves the forward vector used by the recovery pull.
+  local identityQuat = setmetatable({}, {
+    __mul = function(_, v) return vec3(v.x, v.y, v.z) end
+  })
   local mockVeh = {
-    getRotation = function() return { __mul = function() return { x = 0, y = 1, z = 0 } end } end,
+    getRotation = function() return identityQuat end,
     getRefNodeId = function() return 0 end,
     applyClusterVelocityScaleAdd = function(self, node, scale, vec)
       appliedImpulse = true
+      impulse = vec
     end
   }
 
@@ -65,6 +79,8 @@ do
   T.check(ok, 'snatch-strap connected to nearby teammate')
   T.check(res.target == 'Heavy Escort Rig', 'tethered to Heavy Escort Rig within 22m')
   T.check(appliedImpulse == true, 'applied recovery impulse pulling force')
+  T.check(impulse and impulse.x == 0 and impulse.y == 2.5 and impulse.z == 0.5,
+    'recovery impulse pulls forward with a small upward lift')
 
   local st = recovery.getUiState(-26.2, 28.0, mockVeh)
   T.check(st.towActive == true, 'recovery state marks tow active')

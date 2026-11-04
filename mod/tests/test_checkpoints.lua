@@ -126,7 +126,10 @@ do
     id = '#HW-99',
     slots = { { slot = 1, weightKg = 28000 } } -- Tare 18t + 28t = 46,000 kg > 34,000 kg
   }
-  companyState = { company = comp, activeContract = fakeHeavyContract }
+  freight.onRemoteLogistics({
+    type = 'sync_state',
+    state = { company = comp, activeContract = fakeHeavyContract }
+  })
 
   local ok2, res2 = checkpoints.clearCheckpoint('weigh_heidelberg')
   T.check(ok2, 'processed overweight vehicle')

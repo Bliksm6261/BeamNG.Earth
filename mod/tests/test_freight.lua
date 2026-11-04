@@ -117,10 +117,10 @@ do
   local jhb = { name = 'Johannesburg', lat = -26.2041, lon = 28.0473 }
   local jobs = freight.generateJobs(jhb, 9999)
 
-  -- Find a 2-truck contract
+  -- Find a 2-truck contract available without additional carrier licences
   local duoJob = nil
   for _, j in ipairs(jobs) do
-    if j.trucksRequired == 2 then duoJob = j; break end
+    if j.trucksRequired == 2 and not j.locked then duoJob = j; break end
   end
   T.check(duoJob ~= nil, 'found a 2-truck contract for co-op test')
 
@@ -309,6 +309,7 @@ end
 do
   freight.reset()
   local comp = freight.getCompany()
+  comp.reputation = 80 -- Leave room below the 100-point cap for the +7 reward.
   local startVault = comp.vault
   local startRep = comp.reputation
 

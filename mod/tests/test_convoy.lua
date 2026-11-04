@@ -153,7 +153,11 @@ do
       { slot = 3, status = 'in_transit', cargoHealth = 90, claimedBy = 'Rear Guard' }
     }
   }
-  companyState = { company = { name = 'OTBT Fleet' }, activeContract = multiJob }
+  freight.getCompany().name = 'OTBT Fleet'
+  freight.onRemoteLogistics({
+    type = 'sync_state',
+    state = { activeContract = multiJob }
+  })
 
   local targets = convoy.getRadarTargets(-26.2000, 28.0000, nil)
   T.check(#targets == 2, 'radar tracks 2 convoy escorts for 3-truck contract')
