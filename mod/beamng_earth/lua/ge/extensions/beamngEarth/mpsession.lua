@@ -679,6 +679,29 @@ function M.others()
   return out
 end
 
+-- Known remote players, keyed by server id, from the latest anchor snapshot.
+function M.getPeers()
+  local out, mine = {}, myPid()
+  if not rawget(_G, 'TriggerServerEvent') then return out end
+  for id, peer in pairs(anchors) do
+    if tostring(id) ~= mine and type(peer) == 'table' then
+      local copy = {}
+      for k, v in pairs(peer) do copy[k] = v end
+      copy.lat, copy.lon = tonumber(peer.lat), tonumber(peer.lon)
+      out[id] = copy
+    end
+  end
+  return out
+end
+
+function M.sendLogisticsEvent(payload)
+  if type(payload) ~= 'table' or not rawget(_G, 'TriggerServerEvent')
+      or not rawget(_G, 'jsonEncode') then return false end
+  local ok, data = pcall(jsonEncode, payload)
+  if not ok then return false end
+  return pcall(TriggerServerEvent, 'bngeLogistics', data)
+end
+
 -- (tests, the dev tools)
 function M.state() return { anchors = anchors, deactivated = deactivated, joined = joined, wentTo = wentTo } end
 

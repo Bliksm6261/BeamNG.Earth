@@ -30,14 +30,7 @@ local function getFreight()
 end
 
 local function broadcastCamp(payload)
-  local mps = rawget(_G, 'beamngEarth_mpsession') or (extensions and extensions.beamngEarth_mpsession)
-  if mps and mps.isSessionActive and mps.isSessionActive() and mps.sendLogisticsEvent then
-    pcall(mps.sendLogisticsEvent, payload)
-  elseif rawget(_G, 'TriggerServerEvent') then
-    local data = payload
-    if rawget(_G, 'jsonEncode') then data = jsonEncode(payload) end
-    pcall(TriggerServerEvent, 'bngeLogistics', data)
-  end
+  return require('beamngEarth/mpsession').sendLogisticsEvent(payload)
 end
 
 -- Deploy camp at current vehicle location
@@ -115,17 +108,20 @@ function M.restAtCamp(hours)
     return false, 'Must deploy camp first to rest by campfire'
   end
 
-  -- 1. Advance BeamNG TimeOfDay
-  local scenetree = rawget(_G, 'scenetree')
-  local names = scenetree and scenetree.findClassObjects and scenetree.findClassObjects('TimeOfDay')
-  local tod = names and names[1] and scenetree.findObject(names[1])
-  if tod then
-    local currentT = tonumber(tod.time) or 0
-    tod.time = (currentT + hours / 24) % 1.0
+  local fr = getFreight()
+  -- Freight advances time while clearing fatigue; otherwise advance it here.
+  if not (fr and fr.restDriver) then
+    -- 1. Advance BeamNG TimeOfDay
+    local scenetree = rawget(_G, 'scenetree')
+    local names = scenetree and scenetree.findClassObjects and scenetree.findClassObjects('TimeOfDay')
+    local tod = names and names[1] and scenetree.findObject(names[1])
+    if tod then
+      local currentT = tonumber(tod.time) or 0
+      tod.time = (currentT + hours / 24) % 1.0
+    end
   end
 
   -- 2. Clear driver fatigue in freight module
-  local fr = getFreight()
   if fr and fr.restDriver then
     pcall(fr.restDriver, hours)
   end

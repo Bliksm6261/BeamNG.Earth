@@ -82,4 +82,25 @@ do
   T.check(uiSt.canDeploy == true, 'can deploy again when ready')
 end
 
+-- Use real freight to verify camp advances BeamNG time once, across midnight.
+do
+  local oldFreight = package.loaded['beamngEarth/freight']
+  package.loaded['beamngEarth/freight'] = nil
+  local realFreight = require('beamngEarth/freight')
+  beamngEarth_freight = realFreight
+  local tod = {time=0.25} -- 18:00
+  local oldTree = scenetree
+  scenetree = {findClassObjects=function() return {'tod'} end, findObject=function() return tod end}
+  bushcamp.reset()
+  bushcamp.deployCamp(-26, 28, nil)
+  T.check(bushcamp.restAtCamp(8), 'camp rest with real freight succeeds')
+  T.check(math.abs(tod.time - (0.25 + 8/24) % 1) < 1e-9, 'camp advances exactly eight hours from dusk')
+  tod.time = 0.75 -- 06:00
+  realFreight.restDriver(6)
+  T.check(math.abs(tod.time) < 1e-9, 'driver rest advances dawn to noon')
+  scenetree = oldTree
+  beamngEarth_freight = nil
+  package.loaded['beamngEarth/freight'] = oldFreight
+end
+
 T.done('test_bushcamp')

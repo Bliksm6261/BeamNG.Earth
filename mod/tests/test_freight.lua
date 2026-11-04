@@ -211,7 +211,10 @@ do
   })
   T.check(active.slots[2].claimedBy == 'ConvoyMate', 'remote claim updated slot 2 owner')
 
-  -- Remote finalize
+  -- Remote finalize only after every consignment has arrived.
+  T.check(freight.onRemoteLogistics({type='finalize',jobId=active.id}) == false, 'remote completion rejects unfinished contract')
+  active.slots[1].status = 'delivered'
+  active.slots[2].status = 'delivered'
   freight.onRemoteLogistics({
     type = 'finalize',
     jobId = '#MP-9999',
@@ -403,4 +406,30 @@ do
   T.check(stRested.fatiguePercent == 0, 'driver fatigue reset to 0% after 8h sleep')
 end
 
+do
+  freight.reset()
+  local jobs = freight.generateJobs({name='Johannesburg',lat=-26.2,lon=28}, 9999)
+  local job
+  for _, j in ipairs(jobs) do if j.trucksRequired == 2 and not j.locked then job = j; break end end
+  freight.acceptContract(job, 1, 'Owner', 1)
+  local base = job.slots[1].grossPayout
+  T.check(freight.deliverSlot(2, true) == false, 'open slot cannot be delivered')
+  T.check(freight.deliverSlot(1, true), 'claimed slot delivered with bonus')
+  T.check(freight.getActiveContract() == job and job.status == 'in_transit', 'open slot prevents completion')
+  local ok, reason = freight.deliverSlot(1, true)
+  T.check(ok == false and type(reason) == 'string', 'redelivery rejected with reason')
+  T.check(job.slots[1].grossPayout == base + math.floor(base * .2), 'redelivery does not compound bonus')
+  T.check(freight.finalizeContract() == false, 'direct finalization rejects open slot')
+  local remote = {type='deliver_slot',jobId=job.id,slotIndex=2,precisionDock=true,pid=2}
+  T.check(freight.onRemoteLogistics(remote) == false, 'remote open delivery rejected')
+  freight.onRemoteLogistics({type='claim',jobId=job.id,slotIndex=2,playerName='Other',pid=2})
+  MPConfig = {getPlayerServerID=function() return 1 end}
+  T.check(freight.deliverSlot(2) == false, 'cannot deliver another MP player slot')
+  MPConfig = nil
+  local base2 = job.slots[2].grossPayout
+  freight.onRemoteLogistics(remote)
+  T.check(job.slots[2].grossPayout == base2 + math.floor(base2 * .2), 'remote delivery applies bonus once')
+  T.check(freight.onRemoteLogistics(remote) == false, 'remote redelivery rejected')
+  T.check(job.slots[2].grossPayout == base2 + math.floor(base2 * .2), 'remote bonus does not compound')
+end
 T.done('test_freight')

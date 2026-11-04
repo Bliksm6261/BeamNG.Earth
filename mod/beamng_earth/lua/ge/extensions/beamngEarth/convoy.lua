@@ -97,26 +97,10 @@ function M.transmit(channel, message, callsign, code)
   if #radioHistory > MAX_HISTORY then table.remove(radioHistory) end
 
   -- Broadcast via BeamMP if multiplayer active
-  local mps = rawget(_G, 'beamngEarth_mpsession') or (extensions and extensions.beamngEarth_mpsession)
-  if mps and mps.isSessionActive and mps.isSessionActive() and mps.sendLogisticsEvent then
-    pcall(mps.sendLogisticsEvent, {
-      type = 'cb_radio',
-      channel = channel,
-      callsign = callsign,
-      message = message,
-      code = code or 'custom'
-    })
-  elseif rawget(_G, 'TriggerServerEvent') then
-    local payload = {
-      type = 'cb_radio',
-      channel = channel,
-      callsign = callsign,
-      message = message,
-      code = code or 'custom'
-    }
-    if rawget(_G, 'jsonEncode') then payload = jsonEncode(payload) end
-    pcall(TriggerServerEvent, 'bngeLogistics', payload)
-  end
+  require('beamngEarth/mpsession').sendLogisticsEvent({
+    type = 'cb_radio', channel = channel, callsign = callsign,
+    message = message, code = code or 'custom'
+  })
 
   if rawget(_G, 'ui_message') then
     pcall(ui_message, string.format("📻 [CH %d] %s: %s", channel, callsign, message), 6, 'beamngEarthCB')
@@ -165,7 +149,7 @@ function M.getRadarTargets(playerLat, playerLon, playerVeh)
   local peers = mps and mps.getPeers and mps.getPeers()
   if type(peers) == 'table' then
     for id, peer in pairs(peers) do
-      if peer.lat and peer.lon then
+      if type(peer) == 'table' and tonumber(peer.lat) and tonumber(peer.lon) then
         local distM = places.distance(playerLat, playerLon, peer.lat, peer.lon)
         local brng = M.calculateBearing(playerLat, playerLon, peer.lat, peer.lon)
         local clock = M.bearingToClock(brng, truckHeading)

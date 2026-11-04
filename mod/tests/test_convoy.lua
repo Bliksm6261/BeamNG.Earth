@@ -168,4 +168,12 @@ do
   T.check(targets[2].distanceM > targets[1].distanceM, 'rear guard staggered further back')
 end
 
+freight.reset()
+beamngEarth_mpsession = require('beamngEarth/mpsession')
+T.check(#convoy.getRadarTargets(-26, 28) == 0, 'real mpsession with no peers is safe')
+beamngEarth_mpsession = {getPeers=function() return nil end}
+T.check(#convoy.getRadarTargets(-26, 28) == 0, 'nil peers are safe')
+beamngEarth_mpsession = {getPeers=function() return {} end}
+T.check(#convoy.getRadarTargets(-26, 28) == 0, 'empty peers are safe')
+beamngEarth_mpsession = nil
 T.done('test_convoy')

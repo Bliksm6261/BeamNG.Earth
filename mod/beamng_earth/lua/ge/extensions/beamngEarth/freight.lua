@@ -16,9 +16,7 @@ M.EPOCH_INTERVAL_S = 3600 -- contracts rotate every hour (in-game/real-world epo
 local lastBroadcastPenalty = {}
 
 local function broadcastLogistics(payload)
-  if rawget(_G, 'TriggerServerEvent') and rawget(_G, 'jsonEncode') then
-    pcall(TriggerServerEvent, 'bngeLogistics', jsonEncode(payload))
-  end
+  return require('beamngEarth/mpsession').sendLogisticsEvent(payload)
 end
 
 -- Cargo catalog with characteristics and fleet suitability
@@ -484,6 +482,7 @@ function M.acceptContract(job, playerPid, playerName, slotIndex)
 
   job.status = 'in_transit'
   job.acceptedAt = os.time()
+  job.slots[slotIndex].claimedPid = playerPid
   job.slots[slotIndex].claimedBy = playerName or tostring(playerPid or 'Driver 1')
   job.slots[slotIndex].status = 'in_transit'
 
@@ -515,6 +514,7 @@ function M.claimSlot(slotIndex, playerPid, playerName)
   local slot = c.slots[slotIndex]
   if slot.claimedBy ~= nil and slot.status ~= 'open' then return false, 'Slot already claimed' end
 
+  slot.claimedPid = playerPid
   slot.claimedBy = playerName or tostring(playerPid or 'Teammate')
   slot.status = 'in_transit'
   M.saveState()
@@ -555,8 +555,16 @@ end
 -- Complete delivery for a slot
 function M.deliverSlot(slotIndex, precisionDock)
   local c = companyState.activeContract
-  if not c or not c.slots[slotIndex] then return false end
+  if not c or not c.slots[slotIndex] then return false, 'Invalid slot' end
   local slot = c.slots[slotIndex]
+  if c.status ~= 'in_transit' or slot.status ~= 'in_transit' or slot.claimedBy == nil then
+    return false, 'Slot is not currently claimed'
+  end
+  local cfg = rawget(_G, 'MPConfig')
+  local pid = cfg and cfg.getPlayerServerID and cfg.getPlayerServerID()
+  if pid ~= nil and slot.claimedPid ~= nil and tostring(pid) ~= tostring(slot.claimedPid) then
+    return false, 'Slot belongs to another player'
+  end
   slot.status = 'delivered'
 
   local isDock = (precisionDock == true) or (c.precisionDockCompleted == true)
@@ -576,14 +584,16 @@ function M.deliverSlot(slotIndex, precisionDock)
     slotIndex = slotIndex,
     cargoHealth = slot.cargoHealth,
     damagePenalty = slot.damagePenalty,
+    playerName = slot.claimedBy,
+    pid = slot.claimedPid,
     precisionDock = slot.precisionDock,
     dockBonus = slot.dockBonus
   })
 
-  -- Check if all claimed slots are delivered
+  -- Every consignment must be delivered; open slots still need a driver.
   local allDone = true
   for _, s in ipairs(c.slots) do
-    if s.claimedBy ~= nil and s.status ~= 'delivered' then
+    if s.status ~= 'delivered' then
       allDone = false
       break
     end
@@ -600,7 +610,10 @@ end
 -- Finalize entire contract, deposit to company treasury, update stats
 function M.finalizeContract()
   local c = companyState.activeContract
-  if not c then return false end
+  if not c then return false, 'No active contract' end
+  for _, slot in ipairs(c.slots) do
+    if slot.status ~= 'delivered' then return false, 'Undelivered slots remain' end
+  end
 
   local grossEarnings = 0
   local totalPenalties = 0
@@ -1002,7 +1015,9 @@ function M.onRemoteLogistics(msg)
   if msg.type == 'claim' then
     local c = companyState.activeContract
     local sIdx = tonumber(msg.slotIndex)
-    if c and c.slots and sIdx and c.slots[sIdx] then
+    if c and c.id == msg.jobId and c.slots and sIdx and c.slots[sIdx]
+        and c.slots[sIdx].status == 'open' then
+      c.slots[sIdx].claimedPid = msg.pid
       c.slots[sIdx].claimedBy = msg.playerName
       c.slots[sIdx].status = 'in_transit'
       M.saveState()
@@ -1027,7 +1042,18 @@ function M.onRemoteLogistics(msg)
   if msg.type == 'deliver_slot' then
     local c = companyState.activeContract
     local sIdx = tonumber(msg.slotIndex)
-    if c and c.slots and sIdx and c.slots[sIdx] then
+    local slot = c and c.slots and sIdx and c.slots[sIdx]
+    if not slot or c.id ~= msg.jobId or c.status ~= 'in_transit'
+        or slot.status ~= 'in_transit' or slot.claimedBy == nil then
+      return false, 'Slot is not currently claimed'
+    end
+    if slot.claimedPid ~= nil and tostring(slot.claimedPid) ~= tostring(msg.pid) then
+      return false, 'Slot belongs to another player'
+    end
+    if slot then
+      slot.precisionDock = msg.precisionDock == true
+      slot.dockBonus = slot.precisionDock and math.floor(slot.grossPayout * 0.20) or 0
+      slot.grossPayout = slot.grossPayout + slot.dockBonus
       c.slots[sIdx].status = 'delivered'
       c.slots[sIdx].cargoHealth = tonumber(msg.cargoHealth) or c.slots[sIdx].cargoHealth
       c.slots[sIdx].damagePenalty = tonumber(msg.damagePenalty) or c.slots[sIdx].damagePenalty
@@ -1040,6 +1066,11 @@ function M.onRemoteLogistics(msg)
   end
 
   if msg.type == 'finalize' then
+    local c = companyState.activeContract
+    if not c or c.id ~= msg.jobId then return false, 'No matching active contract' end
+    for _, slot in ipairs(c.slots) do
+      if slot.status ~= 'delivered' then return false, 'Undelivered slots remain' end
+    end
     if msg.company then
       companyState.company = msg.company
     end

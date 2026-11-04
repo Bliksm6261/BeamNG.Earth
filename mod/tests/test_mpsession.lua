@@ -161,4 +161,18 @@ T.check(la == 40.0 or la == 40.02, 'pickAnchor: skip leaves our own out')
 -- reset: every car back on
 ms.reset()
 T.check(stranger.active == 1 and next(ms.state().deactivated) == nil, 'reset: the cars back on')
+T.check(type(ms.getPeers) == 'function', 'getPeers exported')
+T.check(next(ms.getPeers()) == nil, 'reset leaves no peers')
+ms.state().anchors['2'] = {name='Wingman',lat=-26,lon=28}
+ms.state().anchors['1'] = {name='Self',lat=-26,lon=28}
+T.check(ms.getPeers()['2'].name == 'Wingman' and ms.getPeers()['1'] == nil, 'known remote peers exclude self')
+local before = #sent
+T.check(ms.sendLogisticsEvent({type='cb_radio'}), 'logistics event sent')
+T.check(#sent == before + 1 and sent[#sent].name == 'bngeLogistics'
+  and sent[#sent].data == jsonEncode({type='cb_radio'}), 'logistics event JSON encoded on shared channel')
+local trigger = TriggerServerEvent
+TriggerServerEvent = nil
+T.check(next(ms.getPeers()) == nil, 'no peers outside MP')
+T.check(ms.sendLogisticsEvent({}) == false, 'offline send safe')
+TriggerServerEvent = trigger
 T.done('test_mpsession')

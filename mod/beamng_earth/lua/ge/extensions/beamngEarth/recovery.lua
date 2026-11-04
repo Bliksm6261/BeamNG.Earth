@@ -26,14 +26,7 @@ end
 
 -- Broadcast recovery event across BeamMP
 local function broadcastRecovery(payload)
-  local mps = rawget(_G, 'beamngEarth_mpsession') or (extensions and extensions.beamngEarth_mpsession)
-  if mps and mps.isSessionActive and mps.isSessionActive() and mps.sendLogisticsEvent then
-    pcall(mps.sendLogisticsEvent, payload)
-  elseif rawget(_G, 'TriggerServerEvent') then
-    local data = payload
-    if rawget(_G, 'jsonEncode') then data = jsonEncode(payload) end
-    pcall(TriggerServerEvent, 'bngeLogistics', data)
-  end
+  return require('beamngEarth/mpsession').sendLogisticsEvent(payload)
 end
 
 -- 1. Field Tire Puncture Repair
