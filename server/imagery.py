@@ -371,6 +371,7 @@ class Imagery:
         self._warm_want = []                # warm(): lazy tiles ahead of the player, nearest first
         self._warm_cv = threading.Condition()
         self._warm_thread = None
+        self._closed = False
         self._inflight = {}
         self._lock = threading.RLock()     # RLock: a done future's callback runs at once
         self._local = threading.local()     # per fetch thread: the kind of the request being loaded
@@ -820,6 +821,8 @@ class Imagery:
             with self._warm_cv:
                 key = None
                 while key is None:
+                    if self._closed:
+                        return
                     if self._warm_want is not want:     # a new list (the player moved on): looked at afresh
                         done, want = set(), self._warm_want
                     for k in self._warm_want:
@@ -842,7 +845,8 @@ class Imagery:
                 self._count(src.name + ":warm")
             except ImageryError as e:       # the host takes no prefetch now / failed: later
                 with self._warm_cv:
-                    self._warm_cv.wait(5.0 if e.deferred else 30.0)
+                    if not self._closed:
+                        self._warm_cv.wait(5.0 if e.deferred else 30.0)
                 continue
             except Exception:
                 log.exception("imagery warm %s", key[1:])
@@ -1113,11 +1117,18 @@ class Imagery:
         return np.asarray(Image.fromarray(out, "RGB").point(self.lut_table)), used
 
     def close(self):
+        """Stop background fetches before their cache directory can be removed."""
+        with self._warm_cv:
+            self._closed = True
+            self._warm_cv.notify_all()
+        if self._warm_thread is not None:
+            self._warm_thread.join()
         if self.deshadow is not None:
             self.deshadow.close()
         if self.colormatch is not None:
             self.colormatch.close()
-        self.pool.shutdown(wait=False, cancel_futures=True)
+        self.pool.shutdown(wait=True, cancel_futures=True)
+        self.urgent_pool.shutdown(wait=True, cancel_futures=True)
 
 
 # --- texture gutter ----------------------------------------------------------------------

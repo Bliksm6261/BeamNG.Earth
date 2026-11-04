@@ -511,10 +511,8 @@ class ExportImageryTest(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
         self.frame = g.EnuFrame(self.LAT, self.LON)
-
-    def tearDown(self):
-        self.tmp.cleanup()
 
     @staticmethod
     def child_colour(x, y):
@@ -541,7 +539,9 @@ class ExportImageryTest(unittest.TestCase):
         self.requests = []
         net = netfetch.Fetcher(transport=ExportTransport(serve_export, serve_xyz, self.requests),
                                sleep=lambda s: None, policies=FAST)
-        return imagery.Imagery(self.tmp.name, ("naip", "usgs"), fetcher=net, tone=0.0)
+        im = imagery.Imagery(self.tmp.name, ("naip", "usgs"), fetcher=net, tone=0.0)
+        self.addCleanup(im.close)
+        return im
 
     def wait(self, im):
         for _ in range(200):
@@ -636,6 +636,7 @@ class ExportImageryTest(unittest.TestCase):
         net = netfetch.Fetcher(transport=ExportTransport(serve_export, serve_xyz, self.requests, by_name=True),
                                sleep=lambda s: None, policies=FAST)
         im = imagery.Imagery(self.tmp.name, ("naipusda", "naip", "usgs"), fetcher=net, tone=0.0)
+        self.addCleanup(im.close)
         self.assertEqual(self.warm(im, [(0.0, 0.0), (1500.0, 0.0)], radius=700.0), [])
         usda = {r[2:] for r in self.requests if r[0] == "naipusda"}
         usgs_naip = {r[2:] for r in self.requests if r[0] == "naip"}
@@ -671,6 +672,7 @@ class ExportImageryTest(unittest.TestCase):
         net = netfetch.Fetcher(transport=ExportTransport(serve_export, serve_xyz, self.requests, by_name=True),
                                sleep=lambda s: None, policies=FAST)
         im = imagery.Imagery(self.tmp.name, ("md6in", "naipusda", "usgs"), fetcher=net, tone=0.0)
+        self.addCleanup(im.close)
         self.assertEqual(self.warm(im, [(0.0, 0.0), (1500.0, 0.0)], radius=700.0), [])
         md = {r[2:] for r in self.requests if r[0] == "md6in"}
         usda = {r[2:] for r in self.requests if r[0] == "naipusda"}
@@ -694,6 +696,7 @@ class ExportImageryTest(unittest.TestCase):
         """A regional source's coverage probe is not fetched for a tile outside its bounds (2026-10-15: Vermont,
         Ohio, NJ ... servers got hundreds of probe requests from a session in Maryland and Switzerland)."""
         im = imagery.Imagery(self.tmp.name, ("vermont", "usgs"), tone=0.0)      # (nothing may be fetched)
+        self.addCleanup(im.close)
         src = imagery.SOURCES["vermont"]
         z = 17
         x, y = imagery.mercator_px(np.array([39.29]), np.array([-76.61]), z)       # Baltimore
@@ -739,6 +742,14 @@ class ExportImageryTest(unittest.TestCase):
         self.assertGreaterEqual(len(parents), 2)            # both ends of the path
         _, used = im.render(self.frame, 3000.0, 0.0, 256.0, 256)
         self.assertEqual(set(used), {"naip"})               # on disk before any render
+
+    def test_close_stops_background_writers(self):
+        im = self.make()
+        im.warm(self.frame, [(128.0, 128.0)], 300.0, 1.0)
+        im.render(self.frame, 0.0, 0.0, 256.0, 256)
+        im.close()
+        self.assertFalse(im._warm_thread.is_alive())
+        self.assertTrue(all(not t.is_alive() for pool in (im.pool, im.urgent_pool) for t in pool._threads))
 
 
 class GutterTest(unittest.TestCase):
