@@ -87,6 +87,7 @@ Environment:
   BNGE_DRIVE_ALPHA      64 cells: the object-count term (default 0.0016 per object over 300)
   BNGE_DRIVE_KEEP_LOG   copy the server log to this file at the end (<name>.<mode> per drive)
   BNGE_DRIVE_MODES      comma list of drives to run (default terrain,mesh,mesh64)
+  BNGE_TEST_NETWORK=1   enable real-DEM drives (network on a cold cache)
   BNGE_SKIP_DRIVE=1     skip both drives
 """
 import asyncio
@@ -411,6 +412,8 @@ def block_heights(blk, x0, y0, n):
     return zb + q * (mh / 65536), f(zb) + q.astype(f) * f(mh / 65536), (gx0, gy0)
 
 
+@unittest.skipUnless(os.environ.get("BNGE_TEST_NETWORK") == "1",
+                     "real-DEM drive needs network on a cold cache; set BNGE_TEST_NETWORK=1")
 class DriveBase(unittest.TestCase):
     """The drive; subclasses pick the server's near-visual mode, imagery and tile layout (cells)."""
     near_visual = "terrain"
@@ -429,7 +432,9 @@ class DriveBase(unittest.TestCase):
              "--weather", "off", "--gravity", "off", "--update-check", "off",  # no network: own tests
              # roads (and the grading under them) wait on Overture road data per block: own tests
              "--roads", "off", *self.server_args],
-            stdout=subprocess.PIPE, stderr=self.errlog, text=True)
+            stdout=subprocess.PIPE, stderr=self.errlog, text=True,
+            # The replay checks desktop texture sizes and the desktop selection table.
+            env=dict(os.environ, BNGE_BUDGET="desktop"))
         self.addCleanup(stop_server, self.proc)     # a failed start too: no server or workers left behind
         line = self.proc.stdout.readline()
         self.assertIn("listening on 127.0.0.1:", line)
