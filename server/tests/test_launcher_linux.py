@@ -96,7 +96,13 @@ class FlatpakSteam(unittest.TestCase):
         touch(os.path.join(self.home, *FP, ".steam", "steam.pid"))
         with open(os.path.join(self.home, *FP, ".steam", "steam.pid"), "w") as f:
             f.write(str(os.getpid()))
-        self.assertTrue(launcher.steam_running())
+        # Model Linux's process entry even when the suite runs on a host without /proc.
+        exists = os.path.exists
+        proc_path = f"/proc/{os.getpid()}"
+        with mock.patch.object(launcher.os.path, "exists", side_effect=lambda p: p == proc_path or exists(p)):
+            self.assertTrue(launcher.steam_running())
+        with mock.patch.object(launcher.os.path, "exists", side_effect=lambda p: p != proc_path and exists(p)):
+            self.assertFalse(launcher.steam_running())
 
 
 class GameClosed(unittest.TestCase):
