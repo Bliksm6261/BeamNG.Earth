@@ -153,7 +153,10 @@ def compute(server_dir):
                                   len(c.desired), _hs(c.desired), _hs(c.refined), len(c.groups),
                                   _h(json.dumps(sorted([sorted(ad), sorted(rm)] for ad, rm in c.groups)).encode()),
                                   _h(",".join(t.key for t in c.queue[:64]).encode()),
-                                  _h(json.dumps(w.msgs[n0:], sort_keys=True).encode())])
+                                  # M1 predates progress and ground-ahead notifications (covered by their own suites).
+                                  _h(json.dumps([m for m in w.msgs[n0:]
+                                                 if m.get("type") not in ("load_progress", "ground_ahead")],
+                                                sort_keys=True).encode())])
             out["drive"] = trace
             out["predict"] = [list(earthd.predict_request(px, py, vx, vy, cx, cy))
                               for px in (-310.0, 0.0, 299.0, 301.0, 455.0) for py in (-120.0, 310.0)
