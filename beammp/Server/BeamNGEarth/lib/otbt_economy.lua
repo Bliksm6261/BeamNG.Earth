@@ -607,4 +607,8 @@ end
 function M.resolve(id, epoch, upgrades)
   for _, job in ipairs(M.board(epoch, upgrades)) do if job.id == id then return job end end
 end
+M.MAX_ACCOUNTS=500
+M.MAX_PAID_CONTRACTS_PER_HOUR=6
+M.DELIVERY_RADIUS_M=2000
+M.MIN_STAGE_SECONDS=60
 return M

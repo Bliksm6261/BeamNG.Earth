@@ -7,7 +7,7 @@ local ids={[1]='account-A',[2]='account-B'}
 local sent={}
 MP={GetPlayerIdentifiers=function(pid) return {beammp=ids[pid]} end,
   TriggerClientEvent=function(pid,event,data) sent[#sent+1]={pid=pid,data=json.decode(data)} end}
-Util={JsonEncode=json.encode,JsonDecode=json.decode}
+Util={JsonEncode=function(v) return json.encode(v):gsub('%[%]', 'null'):gsub('{}','null') end,JsonDecode=json.decode}
 local G=dofile(plugin..'main.lua')
 G.players={[1]={name='A'},[2]={name='B'}}
 local clock=os.time()
@@ -17,6 +17,7 @@ local function intent(pid,t,fields,op)
   clock=clock+1
   counter=counter+1
   local m=fields or {}; m.type=t; m.opId=op or tostring(counter)
+  if t=='deliver_slot' then local c=G.ledger.contracts[m.jobId or m.contractId]; if c then G.players[pid]={name=pid==1 and 'A' or 'B',lat=c.destination.lat,lon=c.destination.lon,poseAt=clock} end end
   return G.onLogistics(pid,m,pid==1 and 'A' or 'B')
 end
 local function company(pid) return G.account(pid,pid==1 and 'A' or 'B').company end
@@ -122,14 +123,15 @@ T.check(not intent(2,'expedition_complete',{expeditionId=exp.id}),'B cannot comp
 T.check(not intent(2,'expedition_stage',{expeditionId=exp.id,stageIndex=2}),'B cannot advance A expedition')
 T.check(not intent(1,'expedition_complete',{expeditionId=exp.id}),'expedition requires stages')
 T.check(not intent(1,'expedition_stage',{expeditionId=exp.id,stageIndex=99}),'stage skipping rejected')
-for i=2,#exp.checkpoints do intent(1,'expedition_stage',{expeditionId=exp.id,stageIndex=i}) end
+for i=2,#exp.checkpoints do clock=clock+G.economy.MIN_STAGE_SECONDS; intent(1,'expedition_stage',{expeditionId=exp.id,stageIndex=i}) end
+clock=clock+G.economy.MIN_STAGE_SECONDS
 vault=company(1).vault
 T.check(intent(1,'expedition_complete',{expeditionId=exp.id,reward=1e9})~=nil,'owner completes ordered expedition')
-T.check(company(1).vault==vault and G.ledger.paid['expedition:'..exp.id],'expedition server reward recorded once')
+T.check(company(1).vault==vault and G.ledger.paid['expedition:account-A:'..exp.id],'expedition server reward recorded once')
 T.check(not intent(1,'expedition_complete',{expeditionId=exp.id}),'repeat expedition rejected')
 local abandoned=job(1)
 intent(1,'accept',{jobId=abandoned.id})
-T.check(intent(1,'abandon',{jobId=abandoned.id})~=nil and G.ledger.contracts[abandoned.id].slots[1].status=='abandoned','owner abandonment transitions remaining slots')
+T.check(intent(1,'abandon',{jobId=abandoned.id})~=nil and G.ledger.contracts[abandoned.id]==nil,'owner abandonment transitions remaining slots')
 local oldVault=company(2).vault
 company(2).vault=0
 T.check(not intent(2,'refuel',{litres=100}),'insufficient fuel funds rejected')
@@ -139,7 +141,7 @@ local rename=os.rename
 os.rename=function() return nil,'simulated rename failure' end
 local prior=company(1).vault
 intent(1,'refuel',{litres=10})
-T.check(company(1).vault==prior-18,'rename failure keeps in-memory debit')
+T.check(company(1).vault==prior-19,'rename failure keeps in-memory debit')
 os.rename=rename
 G.saveLedger()
 vault=company(1).vault
@@ -155,7 +157,7 @@ T.check(replay2 and company(1).vault==vault,'restart retains op replay protectio
 ids[1]='new-account'
 T.check(company(1).vault==25000,'recycled pid cannot inherit balance')
 ids[1]=nil
-T.check(G.playerKey(1,'A')=='guest:A','guest identity uses name')
+T.check(G.playerKey(1,'A')=='guest:1','guest identity uses name')
 local f=assert(io.open(OTBT_LEDGER_PATH,'w')); f:write('{corrupt'); f:close()
 G=dofile(plugin..'main.lua')
 T.check(next(G.ledger.players)==nil,'corrupt ledger starts fresh')
@@ -167,10 +169,11 @@ G=dofile(plugin..'main.lua')
 T.check(next(G.ledger.players)==nil,'invalid ledger schema starts fresh')
 local open=io.open
 io.open=function() return nil,'simulated open failure' end
+ids[1]='account-A'
 local fresh=G.account(1,'A').company
 local starting=fresh.vault
 intent(1,'refuel',{litres=10})
-T.check(fresh.vault==starting-18,'write failure keeps accepted in-memory state')
+T.check(fresh.vault==starting-19,'write failure keeps accepted in-memory state')
 io.open=open
 local events={}
 MP.RegisterEvent=function(event,handler) events[event]=handler end
@@ -185,7 +188,7 @@ for _, message in ipairs(sent) do
 end
 T.check(found,'first pose sends authoritative personal sync')
 BNGE_onLogistics(1,json.encode({type='refuel',opId='wire-fuel',litres=10,cost=0}))
-T.check(sent[#sent].pid==1 and sent[#sent].data.type=='ledger_state' and sent[#sent].data.company.vault==24982,'wire intent decoded and personal authority returned')
+T.check(sent[#sent].pid==1 and sent[#sent].data.type=='ledger_state' and sent[#sent].data.company.vault==24981,'wire intent decoded and personal authority returned')
 -- Rate limiting counts invalid intents too, before any account/ledger writes.
 clock=clock+1; G.now=function() return clock end
 local priorRev=G.ledger.rev
@@ -204,6 +207,7 @@ T.check(count==200 and #account.opOrder==200 and not account.ops['bounded-1'],'o
 rev=G.ledger.rev
 local recent=intent(1,'set_company_name',{name='Must not apply'},'bounded-210')
 T.check(recent and recent.opId=='bounded-210' and G.ledger.rev==rev and account.company.name=='Bounded','recent replay returns result without mutation')
+G.saveLedger()
 G=dofile(plugin..'main.lua'); G.now=function() return clock end
 T.check(intent(1,'set_company_name',{name='Must not apply'},'bounded-210')~=nil and G.account(1,'A').company.name=='Bounded','capped history replays after restart')
 local migrated=G.account(1,'A')

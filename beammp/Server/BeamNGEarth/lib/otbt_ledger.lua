@@ -5,7 +5,24 @@ return function(G, economy, json)
   G.now = G.now or os.time
   G.MAX_OPS = 200
   G.INTENTS_PER_SECOND = 20
-  local rates = {}
+  local rates, syncs, guests = {}, {}, {}
+  local function validId(v) return type(v)=='string' and #v>0 and #v<=64 and not v:find('[^%w_:%-.]') end
+  -- Validate UTF-8 on both Lua 5.3 and LuaJIT, then truncate only whole codepoints.
+  local function text(v, limit)
+    local out, i, size, capped = {}, 1, 0, false
+    while i<=#v do
+      local b=v:byte(i)
+      local n=b<128 and 1 or (b>=194 and b<=223 and 2 or (b>=224 and b<=239 and 3 or (b>=240 and b<=244 and 4 or 0)))
+      if n==0 or i+n-1>#v then return nil end
+      for j=i+1,i+n-1 do local x=v:byte(j); if x<128 or x>191 then return nil end end
+      local b2=v:byte(i+1)
+      if n==3 and ((b==224 and b2<160) or (b==237 and b2>=160)) or n==4 and ((b==240 and b2<144) or (b==244 and b2>=144)) then return nil end
+      if not capped and size+n<=limit then out[#out+1]=v:sub(i,i+n-1); size=size+n else capped=true end
+      i=i+n
+    end
+    if utf8 and utf8.len and not utf8.len(v) then return nil end
+    return table.concat(out)
+  end
   local function trimOps(p)
     local order, seen, missing = {}, {}, {}
     for _, op in ipairs(type(p.opOrder)=='table' and p.opOrder or {}) do
@@ -25,14 +42,14 @@ return function(G, economy, json)
   end
   G.economy = economy
   G.encode = function(t) return (Util and Util.JsonEncode or json.encode)(t) end
-  G.decode = function(s) return (Util and Util.JsonDecode or json.decode)(s) end
+  G.decode = json.decode -- Bounded Lua parser; never recurse through engine JSON on untrusted input.
   function G.loadLedger(path)
     if path then G.LEDGER_PATH = path end
     G.ledger = fresh()
     local f = io.open(G.LEDGER_PATH, 'r')
     if not f then return end
     local data=f:read('*a'); f:close()
-    local ok, v=pcall(G.decode, data)
+    local ok, v=pcall(json.decode, data)
     if ok and type(v)=='table' and type(v.rev)=='number' and type(v.players)=='table'
         and type(v.contracts)=='table' and type(v.paid)=='table' then
       -- Reject syntactically valid JSON with an unusable ledger schema too.
@@ -64,7 +81,12 @@ return function(G, economy, json)
 
       if ok then
         for _, p in pairs(v.players) do trimOps(p) end
-        v.expeditions=v.expeditions or {}; G.ledger=v; return
+        v.expeditions=v.expeditions or {}
+        -- Retire legacy name-keyed guest accounts rather than exposing them to new sessions.
+        for key in pairs(v.players) do if key:sub(1,6)=='guest:' then v.players[key]=nil; v.expeditions[key]=nil end end
+        for id,c in pairs(v.contracts) do if not v.players[c.owner] then v.contracts[id]=nil end end
+        for _,exp in pairs(v.expeditions) do if type(exp)=='table' then exp.stageAt=exp.stageAt or G.now() end end
+        G.ledger=v; return
       end
     end
     local renamed, err=os.rename(G.LEDGER_PATH, G.LEDGER_PATH..'.bad')
@@ -81,37 +103,63 @@ return function(G, economy, json)
     if os.execute then os.execute("mkdir -p -- '" .. dir:gsub("'", "'\\''") .. "'") end
   end
   function G.saveLedger()
-    G.ledger.rev=G.ledger.rev+1
+    G.dirty=true; G.lastSave=G.now()
     local ok, err=pcall(function()
       ensureDirectory(G.LEDGER_PATH)
-      local encoded=G.encode(G.ledger)
+      local encoded=json.encode(G.ledger)
       local f=assert(io.open(G.LEDGER_PATH..'.tmp', 'w'))
       local wrote, why=f:write(encoded); local closed, reason=f:close()
       assert(wrote, why); assert(closed, reason)
       assert(os.rename(G.LEDGER_PATH..'.tmp', G.LEDGER_PATH))
     end)
     if not ok then print('[OTBT] ledger write failed: '..tostring(err)) end
+    if ok then G.dirty=false; G.lastSave=G.now() end
     return ok
+  end
+  function G.flushLedger()
+    if G.dirty and G.now()-(G.lastSave or -math.huge)>=1 then G.saveLedger() end
+  end
+  local function release(slot)
+    slot.status='open'; slot.claimedKey=nil; slot.claimedBy=nil; slot.claimedPid=nil; slot.claimedAt=nil
+    slot.cargoHealth=100; slot.damagePenalty=0; slot.dockBonus=0
+  end
+  function G.maintainLedger()
+    local epoch=math.floor(G.now()/3600)
+    for id,c in pairs(G.ledger.contracts) do
+      if c.status~='in_transit' and (c.epoch or tonumber(id:match('^job:(%d+):')) or epoch)<epoch then
+        G.ledger.contracts[id]=nil; G.dirty=true
+      else
+        for _,slot in ipairs(c.slots) do
+          if slot.status=='claimed' and G.now()-(slot.claimedAt or 0)>math.max(3*economy.minimumTransitSeconds(c),1800) then
+            release(slot); G.dirty=true
+          end
+        end
+      end
+    end
   end
   function G.playerKey(pid, name)
     if MP and MP.GetPlayerIdentifiers then
       local ok, ids=pcall(MP.GetPlayerIdentifiers, pid)
       if ok and type(ids)=='table' and ids.beammp~=nil and tostring(ids.beammp)~='' then return tostring(ids.beammp) end
     end
-    return 'guest:'..name
+    return 'guest:'..tostring(pid)
   end
   function G.account(pid, name)
     local key=G.playerKey(pid,name)
-    local p=G.ledger.players[key]
+    local guest=key:sub(1,6)=='guest:'
+    local store=guest and guests or G.ledger.players
+    local p=store[key]
     if not p then
+      if not guest then local n=0; for _ in pairs(store) do n=n+1 end; if n>=economy.MAX_ACCOUNTS then return nil,key end end
       p={name=name, company={name='OTBT Logistics Co-op',vault=25000,completedDeliveries=0,
         totalTonnesHauled=0,totalEarnings=0,reputation=100,upgrades={}},ops={}}
-      G.ledger.players[key]=p; G.saveLedger()
+      store[key]=p; if not guest then G.dirty=true end
     end
     return p,key
   end
   function G.ledgerState(pid, name, contract)
     local p,key=G.account(pid,name)
+    if not p then return nil end
     if not contract then
       for _, c in pairs(G.ledger.contracts) do
         if c.status=='in_transit' then
@@ -121,9 +169,18 @@ return function(G, economy, json)
         end
       end
     end
+    contract=contract and copy(contract)
+    if contract and contract.owner~=key then contract.owner=nil; for _,slot in ipairs(contract.slots) do slot.claimedKey=nil end end
     return copy({type='ledger_state',company=p.company,contract=contract,
       expedition=G.ledger.expeditions[key], playerKey=key, rev=G.ledger.rev})
   end
+  function G.syncState(pid,name)
+    G.maintainLedger()
+    local state=G.ledgerState(pid,name)
+    if not state then return nil end
+    return {type='sync_state',state={company=state.company,activeContract=state.contract,activeExpedition=state.expedition},playerKey=state.playerKey,rev=G.ledger.rev,jobs=economy.board(math.floor(G.now()/3600),state.company.upgrades)}
+  end
+  function G.forgetGuest(pid) guests['guest:'..tostring(pid)]=nil end
   local function reject(reason)
     print('[OTBT] rejected intent: '..reason)
     return nil,nil
@@ -138,18 +195,24 @@ return function(G, economy, json)
     rate.count=rate.count+1
     if rate.count>G.INTENTS_PER_SECOND then return reject('rate limit') end
     local p=G.account(pid,name)
+    if not p then return reject('account limit') end
     local comp=p.company
     local epoch=math.floor(G.now()/3600)
     if msg.type=='sync_request' then
-      local state=G.ledgerState(pid,name)
-      return {type='sync_state',state={company=state.company,activeContract=state.contract,
-        activeExpedition=state.expedition},playerKey=key,rev=G.ledger.rev,jobs=economy.board(epoch,comp.upgrades)},pid
+      if syncs[key] and now-syncs[key]<5 then return reject('sync rate limit') end
+      syncs[key]=now
+      return G.syncState(pid,name),pid
     end
     if msg.type=='cb_radio' then
-      return {type='cb_radio',channel=tonumber(msg.channel) or 19,callsign=tostring(msg.callsign or name):sub(1,64),
-        message=tostring(msg.message or ''):sub(1,512),code=tostring(msg.code or ''):sub(1,32),time=G.now(),playerName=name,pid=pid},-1
+      return {type='cb_radio',channel=tonumber(msg.channel) or 19,callsign=text(tostring(msg.callsign or name),64) or '',
+        message=text(tostring(msg.message or ''),512) or '',code=text(tostring(msg.code or ''),32) or '',time=G.now(),playerName=name,pid=pid},-1
     end
-    if type(msg.opId)~='string' or #msg.opId<1 or #msg.opId>128 then return reject('opId required') end
+    if key:sub(1,6)=='guest:' then return reject('guest accounts cannot trade') end
+    for _,field in ipairs({'opId','contractId','jobId','upgradeId','expeditionId','checkpointId'}) do
+      if msg[field]~=nil and not validId(msg[field]) then return reject('invalid '..field) end
+    end
+    G.maintainLedger()
+    if not validId(msg.opId) then return reject('opId required') end
     if p.ops[msg.opId] then return copy(p.ops[msg.opId]),pid end
     for _, field in ipairs({'litres','cargoHealth','slotIndex','stageIndex'}) do
       local n=msg[field]
@@ -161,11 +224,18 @@ return function(G, economy, json)
     if idx and (idx%1~=0 or idx<1) then return reject('invalid slot') end
     local s=c and idx and c.slots[idx]
     local broadcast=false
+    local beforeVault=comp.vault
+    local immediate=false
     local function payContract()
       for _, slot in ipairs(c.slots) do if slot.status~='delivered' then return false end end
       local paidKey='contract:'..c.id
       if G.ledger.paid[paidKey] then return true end
-      local owner=G.ledger.players[c.owner].company
+      local account=G.ledger.players[c.owner]
+      local hour=math.floor(now/3600)
+      if account.paidHour~=hour then account.paidHour=hour; account.paidCount=0 end
+      if (account.paidCount or 0)>=economy.MAX_PAID_CONTRACTS_PER_HOUR then return false end
+      account.paidCount=(account.paidCount or 0)+1
+      local owner=account.company
       local gross,penalties,bonus,weight=0,0,0,0
       for _, slot in ipairs(c.slots) do
         gross=gross+slot.grossPayout; penalties=penalties+slot.damagePenalty
@@ -175,8 +245,9 @@ return function(G, economy, json)
       owner.vault=owner.vault+payout; owner.totalEarnings=owner.totalEarnings+payout
       owner.completedDeliveries=owner.completedDeliveries+1
       owner.totalTonnesHauled=owner.totalTonnesHauled+math.floor(weight/1000)
-      owner.reputation=math.max(10,math.min(100,owner.reputation+(penalties>gross*.3 and -5 or (bonus>0 and 7 or 2))))
-      c.status='completed'; c.netPayout=payout; G.ledger.paid[paidKey]=true
+      local ownPenalty=0; for _,slot in ipairs(c.slots) do if slot.claimedKey==c.owner then ownPenalty=ownPenalty+slot.damagePenalty end end
+      owner.reputation=math.max(10,math.min(100,owner.reputation+(ownPenalty>gross*.3 and -5 or (bonus>0 and 7 or 2))))
+      immediate=true; c.status='completed'; c.netPayout=payout; G.ledger.paid[paidKey]=true
       return true
     end
     local t=msg.type
@@ -189,8 +260,8 @@ return function(G, economy, json)
     end
     if t=='set_company_name' then
       if type(msg.name)~='string' then return reject('invalid name') end
-      local clean=msg.name:gsub('[%z\1-\31\127]', ''):sub(1,64)
-      if #clean==0 then return reject('empty name') end
+      local clean=text(msg.name:gsub('[%z\1-\31\127]', ''),64)
+      if not clean or #clean==0 then return reject('empty name') end
       comp.name=clean
     elseif t=='purchase_upgrade' then
       local up
@@ -200,7 +271,7 @@ return function(G, economy, json)
       comp.vault=comp.vault-up.cost; comp.upgrades[up.id]={cost=up.cost,purchasedAt=G.now()}
     elseif t=='refuel' then
       if not msg.litres or msg.litres<=0 or msg.litres>economy.FUEL_CAP then return reject('invalid litres') end
-      local cost=math.floor(msg.litres*economy.FUEL_PRICE)
+      local cost=math.ceil(msg.litres*economy.FUEL_PRICE)
       if comp.vault<cost then return reject('insufficient funds') end
       comp.vault=comp.vault-cost
     elseif t=='checkpoint_clear' then
@@ -234,12 +305,22 @@ return function(G, economy, json)
     elseif t=='claim' then
       if not c or c.status~='in_transit' or not s or s.status~='open' then return reject('slot unavailable') end
       s.status='claimed'; s.claimedAt=G.now(); s.claimedKey=key; s.claimedBy=name; s.claimedPid=pid; broadcast=true
+    elseif t=='release_slot' then
+      if not c or c.status~='in_transit' or c.owner~=key or not s or s.status~='claimed' or s.claimedKey==key then return reject('slot ownership or status') end
+      release(s); broadcast=true
     elseif t=='damage' or t=='deliver_slot' then
       if not c or c.status~='in_transit' or not s or s.status~='claimed' or s.claimedKey~=key then return reject('slot ownership or status') end
       if t=='deliver_slot' and G.now()-(s.claimedAt or G.now())<economy.minimumTransitSeconds(c) then return reject('minimum transit time') end
-      if msg.cargoHealth then s.cargoHealth=math.min(s.cargoHealth,math.min(100,msg.cargoHealth)) end
-      s.damagePenalty=economy.calculatePenalty(s,c.cargo,G.ledger.players[c.owner].company.upgrades)
       if t=='deliver_slot' then
+        local pose=G.players[pid]
+        if not pose or not pose.poseAt or now-pose.poseAt>60 or now<pose.poseAt or not pose.lat or not pose.lon or G.dist(pose.lat,pose.lon,c.destination.lat,c.destination.lon)>economy.DELIVERY_RADIUS_M then return reject('recent destination pose required') end
+        local owner=G.ledger.players[c.owner]
+        if owner.paidHour==math.floor(now/3600) and (owner.paidCount or 0)>=economy.MAX_PAID_CONTRACTS_PER_HOUR then return reject('hourly delivery limit') end
+      end
+      if msg.cargoHealth then s.cargoHealth=math.min(s.cargoHealth,math.min(100,msg.cargoHealth)) end
+      s.damagePenalty=math.min(s.grossPayout,economy.calculatePenalty(s,c.cargo,G.ledger.players[c.owner].company.upgrades))
+      if t=='deliver_slot' then
+        if s.claimedKey~=c.owner and s.damagePenalty>0 then comp.reputation=math.max(10,comp.reputation-5) end
         s.status='delivered'
         -- Precision docking needs authoritative vehicle telemetry; disabled until available.
         s.dockBonus=0; payContract()
@@ -252,13 +333,15 @@ return function(G, economy, json)
     elseif t=='abandon' then
       if not c or c.owner~=key or c.status~='in_transit' then return reject('contract ownership or status') end
       c.status='abandoned'; for _, slot in ipairs(c.slots) do if slot.status~='delivered' then slot.status='abandoned' end end
+      local delivered=false; for _,slot in ipairs(c.slots) do if slot.status=='delivered' then delivered=true end end
+      if not delivered then G.ledger.contracts[id]=nil end
       comp.reputation=math.max(10,comp.reputation-10); broadcast=true
     elseif t=='expedition_start' then
       local tour
       for _, v in ipairs(economy.TOURS) do if v.id==msg.expeditionId then tour=v end end
-      if not tour or G.ledger.expeditions[key] or G.ledger.paid['expedition:'..tour.id] then return reject('expedition unavailable') end
+      if not tour or G.ledger.expeditions[key] or G.ledger.paid['expedition:'..key..':'..tour.id] then return reject('expedition unavailable') end
       if tour.grade and tour.grade>=5 and not comp.upgrades.cert_rock_crawl then return reject('expedition locked') end
-      local exp=copy(tour); exp.owner=key; exp.stageIndex=1; exp.stages=#tour.checkpoints; exp.status='transit'
+      local exp=copy(tour); exp.owner=key; exp.stageIndex=1; exp.stages=#tour.checkpoints; exp.status='transit'; exp.stageAt=now
       G.ledger.expeditions[key]=exp
     elseif t=='abandon_expedition' then
       local exp=G.ledger.expeditions[key]
@@ -267,22 +350,26 @@ return function(G, economy, json)
     elseif t=='expedition_stage' or t=='expedition_complete' then
       local exp=G.ledger.expeditions[key]
       if not exp or exp.owner~=key or exp.id~=msg.expeditionId then return reject('expedition ownership') end
+      if now-(exp.stageAt or now)<economy.MIN_STAGE_SECONDS then return reject('minimum stage time') end
       if t=='expedition_stage' then
         if msg.stageIndex~=exp.stageIndex+1 or msg.stageIndex>exp.stages then return reject('stage order') end
-        exp.stageIndex=msg.stageIndex; exp.status='active'
+        exp.stageAt=now; exp.stageIndex=msg.stageIndex; exp.status='active'
       else
-        if exp.stageIndex~=exp.stages or G.ledger.paid['expedition:'..exp.id] then return reject('expedition incomplete or paid') end
+        if exp.stageIndex~=exp.stages or G.ledger.paid['expedition:'..key..':'..exp.id] then return reject('expedition incomplete or paid') end
         local reward=economy.EXPEDITION_REWARDS[exp.id] or 0
-        comp.vault=comp.vault+reward; G.ledger.paid['expedition:'..exp.id]=true; G.ledger.expeditions[key]=nil
+        immediate=true; comp.vault=comp.vault+reward; G.ledger.paid['expedition:'..key..':'..exp.id]=true; G.ledger.expeditions[key]=nil
       end
     else return reject('unknown intent') end
-    local result=G.ledgerState(pid,name,c)
+    local contractIntent={accept=true,claim=true,damage=true,deliver_slot=true,finalize=true,abandon=true,release_slot=true}
+    local result=G.ledgerState(pid,name,contractIntent[t] and c or nil)
     result.rev=G.ledger.rev+1
-    result.opId=msg.opId; result.intent=t; result.expeditionId=msg.expeditionId; result.checkpointId=msg.checkpointId
+    result.opId=msg.opId; result.intent=t; result.expeditionId=t:find('expedition') and msg.expeditionId or nil; result.checkpointId=t=='checkpoint_clear' and msg.checkpointId or nil
     if t=='purchase_upgrade' then result.jobs=economy.board(epoch,comp.upgrades) end
     p.ops[msg.opId]=copy(result)
     trimOps(p)
-    G.saveLedger()
+    G.ledger.rev=G.ledger.rev+1
+    G.dirty=true
+    if immediate or comp.vault~=beforeVault then G.saveLedger() end
     if broadcast and MP and MP.TriggerClientEvent then
       local public=copy(c)
       public.owner=nil

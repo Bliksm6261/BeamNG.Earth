@@ -122,3 +122,34 @@ price without the local Home Base discount. Operation results, paid IDs, and
 contracts are retained without pruning. The JSON file is a single-process store;
 a failed write can lose recent changes after a crash. Guest identities follow
 player names and have no protection against name reuse.
+
+### Economy abuse controls
+
+Ledger files always use the bundled `otbt_json` codec, independently of BeamMP's
+`Util.Json*` behavior. Wire input uses its depth-bounded decoder and rejects
+payloads over 8192 bytes. Intent IDs are restricted to 64 characters from
+letters, digits, underscore, colon, hyphen and dot.
+
+Delivery requires the minimum transit time and a valid `bngePose` received within
+60 seconds, within 2 km of the destination. **Poses are client-supplied**: this
+raises the bar against unattended payments but does not prove that a player drove.
+Paid contract completions are capped at six per account per clock hour. These
+limits, the 500 persisted-account cap, and 60-second expedition stage minimum
+are constants in `lib/otbt_economy.lua`. Expedition rewards come from its table;
+payment keys include the account, so another player's completion cannot lock a tour.
+
+Guests have separate session-only accounts, are never saved, and cannot trade
+(`guest accounts cannot trade`). Existing name-keyed guest accounts are retired
+on load. The board and personal sync remain available to guests.
+
+Claims expire after the greater of three minimum transit times or 30 minutes.
+The owner can send `release_slot` with `contractId`, `slotIndex` and a fresh
+`opId` to release another player's undelivered claim. Slot penalties cannot exceed
+that slot's gross payout, and claimant damage cannot reduce the owner's reputation.
+Abandoning a contract with no delivered slots returns it to the board; finished
+contracts from earlier board epochs are purged.
+
+Explicit sync requests are limited to one per five seconds per account. Initial
+join sync bypasses intent limits. Nonmonetary changes mark the ledger dirty and
+are flushed by `BNGE_tick` (normally every two seconds), at most once per second;
+payouts and debits flush immediately. Failed writes leave the ledger dirty for retry.

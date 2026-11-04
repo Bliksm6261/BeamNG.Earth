@@ -89,6 +89,7 @@ function G.onPose(pid, d, name)
   end
   local moved = first or p.aLat ~= aLat or p.aLon ~= aLon
   p.name, p.aLat, p.aLon, p.lat, p.lon, p.t = name, aLat, aLon, lat, lon, G.clock
+  p.poseAt=G.now()
   local h = tonumber(d.h)
   p.h = (h and h >= 0 and h <= 360) and h or nil
   local sp = tonumber(d.sp)
@@ -162,6 +163,7 @@ if MP and MP.RegisterEvent then
   local function encode(t) return G.encode(t) end
 
   function BNGE_onPose(pid, data)
+    if type(data)~='string' or #data>8192 then return end
     local ok, d = pcall(G.decode, data)
     if not ok then return end
     local known = G.players[pid] ~= nil
@@ -173,7 +175,8 @@ if MP and MP.RegisterEvent then
     end
     if p and not known then
       MP.TriggerClientEvent(pid, 'bngeConfig', encode(G.config()))
-      MP.TriggerClientEvent(pid, 'bngeLogistics', encode((G.onLogistics(pid, { type = 'sync_request' }, p.name))))
+      local sync=G.syncState(pid,p.name)
+      if sync then MP.TriggerClientEvent(pid, 'bngeLogistics', encode(sync)) end
       print(string.format('[BeamNG.Earth] %s at %.5f, %.5f (anchor %s)', tostring(p.name), p.lat, p.lon,
         G.key(p.aLat, p.aLon)))
     end
@@ -186,9 +189,10 @@ if MP and MP.RegisterEvent then
     end
   end
 
-  function BNGE_onLeave(pid) G.onLeave(pid) end
+  function BNGE_onLeave(pid) G.onLeave(pid); G.forgetGuest(pid) end
 
   function BNGE_onLogistics(pid, data)
+    if type(data)~='string' or #data>8192 then return end
     local ok, d = pcall(G.decode, data)
     if not ok or type(d) ~= 'table' then return end
     local p = G.players[pid]
@@ -200,6 +204,7 @@ if MP and MP.RegisterEvent then
   end
 
   function BNGE_tick()
+    G.maintainLedger(); G.flushLedger()
     MP.TriggerClientEvent(-1, 'bngeAnchors', encode(G.tick(G.TICK_MS / 1000)))
     for pid, g in pairs(G.peers(G.live())) do
       local sig = G.peersKey(g)
