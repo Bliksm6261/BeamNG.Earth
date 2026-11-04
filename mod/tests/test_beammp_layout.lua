@@ -23,5 +23,5 @@ G.LEDGER_PATH=os.tmpname()
 T.check(G.saveLedger() and called==G.LEDGER_PATH:match('^(.*)/'),'BeamMP FS directory creation used')
 os.remove(G.LEDGER_PATH); FS=nil
 local result=os.execute('python3 "'..dir..'/check_beammp_package.py"')
-T.check(result==0,'BeamMP archive includes lib and excludes ledger data; installer extracts archive')
+T.check(result==0 or result==true,'BeamMP archive includes lib and excludes ledger data; installer extracts archive')
 T.done('test_beammp_layout')
