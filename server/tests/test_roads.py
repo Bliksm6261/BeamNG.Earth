@@ -8,6 +8,7 @@ import sys
 import tempfile
 import math
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 
@@ -870,6 +871,15 @@ class TrackerTest(unittest.TestCase):
         for make, kind in ((roads.Tracker, "roads"), (vegetation.Tracker, "veg")):
             conn, built = FakeConn(), []
             tr = make()
+            submitted = []
+
+            class RecordingPool(ThreadPoolExecutor):
+                def submit(self, fn, aid, tx, ty):
+                    submitted.append((tx, ty))
+                    return super().submit(fn, aid, tx, ty)
+
+            tr.pool = RecordingPool(max_workers=8)
+            self.addCleanup(tr.pool.shutdown, wait=True)
             cam = (5000.0, 0.0)
 
             async def go(view, n=60):
@@ -882,7 +892,8 @@ class TrackerTest(unittest.TestCase):
             car, seen = set(roads.tiles_near(0, 0, send)), set(roads.tiles_near(*cam, send))
             asyncio.run(go(cam))
             self.assertEqual(set(built), car | seen, kind)
-            self.assertEqual(set(built[:len(car)]), car, f"{kind}: the car's tiles first")
+            # Priority is submission order; worker threads may start out of order.
+            self.assertEqual(set(submitted[:len(car)]), car, f"{kind}: the car's tiles first")
             self.assertFalse([m for m in conn.sent if m["type"].endswith("_drop")], f"{kind}: none dropped")
             asyncio.run(go(None, 2))            # the camera back at the car: the camera's tiles go
             drops = {tuple(map(int, m["key"].split("_"))) for m in conn.sent if m["type"].endswith("_drop")}
@@ -895,6 +906,15 @@ class TrackerTest(unittest.TestCase):
         for make, kind in ((roads.Tracker, "roads"), (vegetation.Tracker, "veg")):
             conn, built = FakeConn(), []
             tr = make()
+            submitted = []
+
+            class RecordingPool(ThreadPoolExecutor):
+                def submit(self, fn, aid, tx, ty):
+                    submitted.append((tx, ty))
+                    return super().submit(fn, aid, tx, ty)
+
+            tr.pool = RecordingPool(max_workers=8)
+            self.addCleanup(tr.pool.shutdown, wait=True)
             focus = (4000.0, 0.0, 320.0, True)
 
             async def go(foci, n=60):
@@ -908,7 +928,8 @@ class TrackerTest(unittest.TestCase):
             near = set(roads.tiles_near(4000.0, 0.0, min(send, 320.0 + roads.TILE / 2)))
             asyncio.run(go((focus,)))
             self.assertEqual(set(built), car | near, kind)
-            self.assertEqual(set(built[:len(car)]), car, f"{kind}: the car's tiles first")
+            # Priority is submission order; worker threads may start out of order.
+            self.assertEqual(set(submitted[:len(car)]), car, f"{kind}: the car's tiles first")
             self.assertFalse([m for m in conn.sent if m["type"].endswith("_drop")], f"{kind}: none dropped")
             asyncio.run(go((), 2))              # the other car gone: its tiles go
             drops = {tuple(map(int, m["key"].split("_"))) for m in conn.sent if m["type"].endswith("_drop")}
