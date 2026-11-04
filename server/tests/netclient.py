@@ -29,18 +29,33 @@ def stop_server(proc):
     # (a test's temp folder removed under them: "Directory not empty", 1 run in 6)
     end = time.monotonic() + 10
     while kids and time.monotonic() < end:
-        kids = [k for k in kids if os.path.exists(f"/proc/{k}")]
+        kids = [k for k in kids if _running(k)]
         if kids:
             time.sleep(0.1)
 
 
 def _children(pid):
-    """The pids of a process's children (Linux; [] elsewhere)."""
+    """The pids of a process's children (Linux / macOS; taskkill handles Windows)."""
     try:
         with open(f"/proc/{pid}/task/{pid}/children") as f:
             return [int(k) for k in f.read().split()]
     except (OSError, ValueError):
-        return []
+        if sys.platform != "darwin":
+            return []
+    result = subprocess.run(["ps", "-axo", "pid=,ppid="], capture_output=True, text=True, check=True)
+    return [int(child) for line in result.stdout.splitlines() for child, parent in [line.split()]
+            if int(parent) == pid]
+
+
+def _running(pid):
+    if sys.platform == "darwin":
+        # macOS has no /proc; a worker can still write after its server has exited.
+        try:
+            os.kill(pid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+    return os.path.exists(f"/proc/{pid}")
 
 
 class Client:
