@@ -4,6 +4,7 @@
 -- core; damage sent when a player comes near; reset turns the cars back on.
 local dir = (arg[0]:match('^(.*)[/\\]') or '.')
 local T = dofile(dir .. '/testlib.lua')
+package.loaded['beamngEarth/settings'] = { get = function(key) return key == 'otbtLogisticsEnabled' end }
 local S = dofile(dir .. '/stubs.lua')
 local ms = require('beamngEarth/mpsession')
 

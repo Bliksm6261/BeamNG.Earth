@@ -273,6 +273,7 @@ const settingsSchema = [
   {
     name: "Multiplayer",
     items: [
+      { id: "otbtLogisticsEnabled", type: "bool", default: false, name: "OTBT logistics", desc: "Enable freight, expeditions and OTBT HQ." },
       { id: "autoJoin", type: "bool", default: true, name: "Join the edition's server", desc: "When the game starts through the app, join the edition's BeamMP server by itself (signed in to BeamMP, or as a guest). Off: BeamMP's own server list. Takes effect at the next game start." },
     ],
   },

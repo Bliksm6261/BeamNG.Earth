@@ -6,6 +6,7 @@
 
 local dir = (arg and arg[0] or ''):match('^(.*)[/\\]') or '.'
 local T = dofile(dir .. '/testlib.lua')
+package.loaded['beamngEarth/settings'] = { get = function(key) return key == 'otbtLogisticsEnabled' end }
 
 -- Stub dependencies
 local storage = {}

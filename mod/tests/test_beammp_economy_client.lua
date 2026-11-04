@@ -1,10 +1,11 @@
 local dir=(arg[0]:match('^(.*)[/\\]') or '.')
 local T=dofile(dir..'/testlib.lua')
+package.loaded['beamngEarth/settings'] = { get = function(key) return key == 'otbtLogisticsEnabled' end }
 dofile(dir..'/stubs.lua')
 package.loaded['beamngEarth/gps']={setDestination=function() end}
 local freight=require('beamngEarth/freight')
 local places=require('beamngEarth/places')
-local economy=dofile(dir..'/../../beammp/Server/BeamNGEarth/otbt_economy.lua')
+local economy=dofile(dir..'/../../beammp/Server/BeamNGEarth/lib/otbt_economy.lua')
 local company=freight.getCompany()
 for _, upgrades in ipairs({{}, {license_reefer={},license_hazmat={},license_heavy_haul={},garage_repair_bay={}}}) do
   company.upgrades=upgrades

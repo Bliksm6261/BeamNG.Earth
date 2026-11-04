@@ -60,6 +60,7 @@ end
 
 -- Set active radio channel
 function M.setChannel(ch)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   ch = tonumber(ch) or 19
   for _, c in ipairs(M.CHANNELS) do
     if c.id == ch then
@@ -76,6 +77,7 @@ end
 
 -- Transmit CB radio message
 function M.transmit(channel, message, callsign, code)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   channel = tonumber(channel) or currentChannel
   message = tostring(message or ''):sub(1, 120)
   if #message == 0 then return false, 'Empty transmission' end
@@ -111,6 +113,7 @@ end
 
 -- Receive incoming radio message from server/peer
 function M.receiveRadioMessage(msg)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if type(msg) ~= 'table' then return end
   local entry = {
     channel = tonumber(msg.channel) or 19,

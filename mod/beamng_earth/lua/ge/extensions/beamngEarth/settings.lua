@@ -36,6 +36,7 @@ M.LEVEL_ID = 'beamng_earth'
 
 -- key -> { kind = 'number'|'bool'|'enum', default, min, max, values, label }. Order = ORDER.
 M.SCHEMA = {
+  otbtLogisticsEnabled = { kind = 'bool', default = false, label = 'OTBT logistics' },
   rebaseDistance = { kind = 'number', default = rebase.DEFAULT_DISTANCE, min = rebase.MIN_DISTANCE,
     max = rebase.MAX_DISTANCE, label = 'Rebase distance (m)' },
   viewDistanceMode = { kind = 'enum', default = 'horizon', values = { 'fixed', 'horizon' }, label = 'View distance' },
@@ -71,7 +72,7 @@ M.SCHEMA = {
   -- not on the page: the newer version whose update notice the player dismissed (core.lua drawUpdateNotice)
   updateDismissed = { kind = 'string', default = '', maxLen = 40, label = 'Update notice dismissed (version)' },
 }
-M.ORDER = { 'rebaseDistance', 'viewDistanceMode', 'viewDistanceKm', 'hazeStrength', 'skyMode', 'clouds',
+M.ORDER = { 'otbtLogisticsEnabled', 'rebaseDistance', 'viewDistanceMode', 'viewDistanceKm', 'hazeStrength', 'skyMode', 'clouds',
   'weatherMode', 'realGravity', 'groundCover', 'groundCoverDensity', 'roads', 'hudVisible', 'statusBar',
   'placeNamesOnline', 'creditsVisible',
   'creditsCorner', 'creditsSize', 'autoJoin', 'cacheCapGb', 'devOutlineKm', 'devMapKm' }
@@ -215,6 +216,12 @@ local function applyViewDistance()
 end
 
 M.APPLY = {
+  otbtLogisticsEnabled = function(v)
+    if v then
+      require('beamngEarth/freight').loadState()
+      require('beamngEarth/expeditions').loadState()
+    end
+  end,
   rebaseDistance = function(v)
     local core = ext('beamngEarth_core')
     if core and core.setRebaseDistance then core.setRebaseDistance(v) else rebase.setDistance(v) end
@@ -507,6 +514,7 @@ function M.uiMapState()
   local ok, ps = pcall(places.uiState)
   if not ok then ps = { places = {}, recent = {} } end
   return {
+    otbtLogisticsEnabled = M.get('otbtLogisticsEnabled'),
     connected = net.isConnected(), connection = net.state(),
     mapPort = net.isConnected() and st and st.mapPort or nil,
     player = (pl and pl.lat) and { lat = pl.lat, lon = pl.lon, heading = playerHeading(), speed = pl.speed } or nil,
@@ -558,7 +566,10 @@ function M.uiFreightAccept(jobId, slotIndex)
   local jobs = freight.getAvailableJobs(pl and pl.lat, pl and pl.lon)
   for _, j in ipairs(jobs) do
     if j.id == jobId then
-      local ok, res = freight.acceptContract(j, 1, 'Player 1', slotIndex or 1)
+      local cfg = rawget(_G, 'MPConfig')
+      local pid = cfg and cfg.getPlayerServerID and cfg.getPlayerServerID() or 0
+      local name = cfg and cfg.getNickname and cfg.getNickname() or tostring(pid)
+      local ok, res = freight.acceptContract(j, pid, name, slotIndex or 1)
       return { ok = ok, contract = res }
     end
   end

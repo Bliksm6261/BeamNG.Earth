@@ -31,6 +31,7 @@ end
 
 -- 1. Field Tire Puncture Repair
 function M.repairTires(playerVeh)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if not playerVeh then
     return false, 'No player vehicle found'
   end
@@ -56,6 +57,7 @@ end
 
 -- 2. Kinetic Snatch-Strap & Tow Recovery
 function M.connectSnatchStrap(playerLat, playerLon, playerVeh)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if not playerVeh then return false, 'No player vehicle' end
 
   local cv = getConvoy()
@@ -97,6 +99,7 @@ end
 
 -- 3. Broadcast 10-33 Breakdown Emergency SOS on Channel 9
 function M.sendEmergencySos(playerLat, playerLon, playerVeh)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   local cv = getConvoy()
   if not cv then return false, 'CB radio module unavailable' end
 
@@ -117,6 +120,7 @@ end
 
 -- 4. High-Lift Jack & Suspension Realignment
 function M.realignSuspension(playerVeh)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if not playerVeh then return false, 'No player vehicle' end
 
   local speed = playerVeh.getVelocity and playerVeh:getVelocity():length() or 0

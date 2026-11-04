@@ -212,6 +212,7 @@ local function canClear(id, now)
   return lastClearedId ~= id or now - lastClearedTime > 60
 end
 function M.onRemoteLogistics(msg)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if msg.type == 'ledger_state' and msg.intent == 'checkpoint_clear' and msg.checkpointId then
     lastClearedId = msg.checkpointId; lastClearedTime = os.time()
     clearedEpoch[msg.checkpointId] = math.floor(lastClearedTime / 3600)
@@ -246,6 +247,7 @@ end
 
 -- Process checkpoint clearance
 function M.clearCheckpoint(cpId, playerLat, playerLon)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   local cp = nil
   for _, c in ipairs(M.CHECKPOINTS) do
     if c.id == cpId then cp = c; break end
@@ -361,6 +363,7 @@ end
 
 -- Update per-frame/tick (called by freight.lua)
 function M.update(playerLat, playerLon, playerVeh)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if not playerLat or not playerLon then
     activeNearby = nil
     return

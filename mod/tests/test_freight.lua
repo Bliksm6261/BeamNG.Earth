@@ -8,6 +8,7 @@
 
 local dir = (arg and arg[0] or ''):match('^(.*)[/\\]') or '.'
 local T = dofile(dir .. '/testlib.lua')
+package.loaded['beamngEarth/settings'] = { get = function(key) return key == 'otbtLogisticsEnabled' end }
 local S = dofile(dir .. '/stubs.lua')
 
 -- Stub JSON and GPS dependencies for test isolation

@@ -356,6 +356,7 @@ function M.getUpgradesList()
 end
 
 function M.purchaseUpgrade(upgradeId)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if multiplayer() then return broadcastLogistics({type='purchase_upgrade',upgradeId=upgradeId}), 'pending' end
   local c = companyState.company
   if not c then return false, 'Company not initialized' end
@@ -393,6 +394,7 @@ function M.purchaseUpgrade(upgradeId)
 end
 
 function M.setCompanyName(name)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if multiplayer() then return broadcastLogistics({type='set_company_name',name=name}), 'pending' end
   if type(name) ~= 'string' then return false, 'Name must be a string' end
   name = name:match('^%s*(.-)%s*$') or ''
@@ -416,6 +418,7 @@ end
 
 -- Load state from JSON file
 function M.loadState()
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if rawget(_G, 'jsonReadFile') then
     local data = jsonReadFile(M.FILE)
     if type(data) == 'table' and data.company then
@@ -428,6 +431,7 @@ end
 
 -- Save state to JSON file
 function M.saveState()
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if rawget(_G, 'jsonWriteFile') then
     return jsonWriteFile(M.FILE, companyState, true)
   end
@@ -461,6 +465,7 @@ end
 
 -- Spawn a matching trailer hitched behind the current player vehicle
 function M.spawnContractTrailer()
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   local c = companyState.activeContract
   if not c or not c.cargo then return false, 'No active contract' end
   local pVeh = rawget(_G, 'getPlayerVehicle') and getPlayerVehicle(0)
@@ -486,6 +491,7 @@ end
 
 -- Accept a contract from the market
 function M.acceptContract(job, playerPid, playerName, slotIndex)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if multiplayer() then return broadcastLogistics({type='accept',jobId=job and job.id,slotIndex=slotIndex or 1}), 'pending' end
   if job and job.locked then
     return false, job.lockReason or 'Company lacks required carrier certification'
@@ -528,6 +534,7 @@ end
 
 -- Claim an open consignment slot in an active multi-truck contract
 function M.claimSlot(slotIndex, playerPid, playerName)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if multiplayer() then return broadcastLogistics({type='claim',jobId=companyState.activeContract and companyState.activeContract.id,slotIndex=slotIndex}), 'pending' end
   local c = companyState.activeContract
   if not c or c.status ~= 'in_transit' then return false, 'No active contract in transit' end
@@ -553,6 +560,7 @@ end
 
 -- Record cargo damage on a claimed slot
 function M.recordDamage(slotIndex, damagePercent)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if multiplayer() then return broadcastLogistics({type='damage',jobId=companyState.activeContract and companyState.activeContract.id,slotIndex=slotIndex,cargoHealth=math.max(0,100-damagePercent)}) end
   local c = companyState.activeContract
   if not c or not c.slots[slotIndex] then return false end
@@ -576,6 +584,7 @@ end
 
 -- Complete delivery for a slot
 function M.deliverSlot(slotIndex, precisionDock)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if multiplayer() then return broadcastLogistics({type='deliver_slot',jobId=companyState.activeContract and companyState.activeContract.id,slotIndex=slotIndex,cargoHealth=companyState.activeContract and companyState.activeContract.slots[slotIndex] and companyState.activeContract.slots[slotIndex].cargoHealth}), 'pending' end
   local c = companyState.activeContract
   if not c or not c.slots[slotIndex] then return false, 'Invalid slot' end
@@ -632,6 +641,7 @@ end
 
 -- Finalize entire contract, deposit to company treasury, update stats
 function M.finalizeContract()
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if multiplayer() then return broadcastLogistics({type='finalize',jobId=companyState.activeContract and companyState.activeContract.id}), 'pending' end
   local c = companyState.activeContract
   if not c then return false, 'No active contract' end
@@ -761,6 +771,7 @@ end
 
 -- Refuel truck at station or Home Base
 function M.refuelVehicle(lat, lon)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   local status = M.getDriverStatus(lat, lon)
   if not status.canRefuel then
     return false, 'Must be near a town or Home Base with at least 5L fuel deficit'
@@ -798,6 +809,7 @@ end
 
 -- Rest / sleep to eliminate driver fatigue and advance time of day
 function M.restDriver(hours)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   hours = hours or 8
   local pVeh = rawget(_G, 'getPlayerVehicle') and getPlayerVehicle(0)
   local speed = pVeh and pVeh.getVelocity and pVeh:getVelocity():length() or 0
@@ -842,6 +854,7 @@ function M.getVehicleDamage(veh)
 end
 
 function M.update(playerLat, playerLon, playerVeh)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   local c = companyState.activeContract
   if not c or c.status ~= 'in_transit' then return end
 
@@ -968,6 +981,7 @@ end
 
 -- Abandon contract
 function M.abandonContract()
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if multiplayer() then return broadcastLogistics({type='abandon',jobId=companyState.activeContract and companyState.activeContract.id}), 'pending' end
   local c = companyState.activeContract
   if not c then return false end
@@ -983,6 +997,7 @@ end
 
 -- Remote event handler from BeamMP server
 function M.onRemoteLogistics(msg)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if type(msg) ~= 'table' or type(msg.type) ~= 'string' then return end
 
   if msg.type == 'slot_state' then
@@ -1182,6 +1197,7 @@ function M.reset()
 end
 
 function M.clearCheckpoint(cpId, playerLat, playerLon)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if checkpoints and checkpoints.clearCheckpoint then
     return checkpoints.clearCheckpoint(cpId, playerLat, playerLon)
   end

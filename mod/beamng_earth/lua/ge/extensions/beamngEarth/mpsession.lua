@@ -701,6 +701,7 @@ end
 local opCounter = 0
 local opSession = tostring(os.time()) .. ':' .. tostring({})
 function M.sendLogisticsEvent(payload)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if type(payload) ~= 'table' or not rawget(_G, 'TriggerServerEvent')
       or not rawget(_G, 'jsonEncode') then return false end
   if M.isSessionActive() then

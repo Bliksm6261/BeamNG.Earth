@@ -111,6 +111,7 @@ end
 
 -- Apply preset to BeamNG weather system
 function M.applyPreset(presetId)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   local preset = nil
   for _, p in ipairs(M.PRESETS) do
     if p.id == presetId then preset = p; break end
@@ -207,6 +208,7 @@ end
 
 -- Per-tick update: manages dynamic tire friction on mud and thermal engine strain
 function M.update(playerLat, playerLon, playerVeh)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   local now = os.time()
   if now - lastPhysicsTick < 3 then return end
   lastPhysicsTick = now
@@ -256,6 +258,7 @@ function M.getUiState()
 end
 
 function M.setAutoWeather(enabled)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   autoWeatherEnabled = enabled and true or false
   return autoWeatherEnabled
 end

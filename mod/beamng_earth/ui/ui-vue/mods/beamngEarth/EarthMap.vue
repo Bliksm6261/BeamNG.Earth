@@ -130,7 +130,7 @@
             <span class="layer-hint">(world to city zoom)</span></label>
         </div>
       </div>
-      <button class="map-btn" :class="{ on: hqOpen }" @click="toggleHq" title="OTBT Operations: Home Base, Overlanding &amp; Trucking">OTBT HQ</button>
+      <button v-if="state.otbtLogisticsEnabled" class="map-btn" :class="{ on: hqOpen }" @click="toggleHq" title="OTBT Operations: Home Base, Overlanding &amp; Trucking">OTBT HQ</button>
       <button v-if="!embedded" class="map-btn close" @click="close" title="Close (Esc / M)">Close</button>
     </div>
 
@@ -240,7 +240,7 @@
     </div>
 
     <!-- Unified OTBT Operations & HQ Modal -->
-    <div v-if="hqOpen" class="freight-modal-backdrop" @click="hqOpen = false">
+    <div v-if="state.otbtLogisticsEnabled && hqOpen" class="freight-modal-backdrop" @click="hqOpen = false">
       <div class="freight-modal" @click.stop @mousedown.stop @wheel.stop>
         <div class="freight-header">
           <div class="freight-title">
@@ -1020,7 +1020,7 @@ function pollHq() {
 
 function toggleHq() {
   hqOpen.value = !hqOpen.value
-  if (hqOpen.value) pollHq()
+  if (state.value.otbtLogisticsEnabled && hqOpen.value) pollHq()
 }
 
 function travelHomeBase() {
@@ -1193,7 +1193,7 @@ function engineLua(script, cb) {
 
 // ---- state from Lua (every second) -------------------------------------------------------
 function poll() {
-  if (hqOpen.value) pollHq()
+  if (state.value.otbtLogisticsEnabled && hqOpen.value) pollHq()
   engineLua("beamngEarth_settings and beamngEarth_settings.uiMapState and beamngEarth_settings.uiMapState() or nil", s => {
     if (!s) { state.value = { places: [], recent: [], missing: true }; return }
     state.value = { places: [], recent: [], ...s }

@@ -118,6 +118,7 @@ end
 
 -- Update loop: detects approach into wildlife/livestock hazard zones
 function M.update(playerLat, playerLon, playerVeh)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if not playerLat or not playerLon then
     currentHazard = nil
     return
@@ -147,6 +148,7 @@ end
 
 -- Spawns or configures regional AI corridor traffic
 function M.spawnCorridorTraffic(density)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   density = tonumber(density) or trafficDensity
   trafficDensity = math.max(0.0, math.min(1.0, density))
 
@@ -188,6 +190,7 @@ function M.getUiState(playerLat, playerLon)
 end
 
 function M.setDensity(val)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   trafficDensity = math.max(0.0, math.min(1.0, tonumber(val) or 0.65))
   return trafficDensity
 end

@@ -167,6 +167,7 @@ end
 
 -- Load state from JSON
 function M.loadState()
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if rawget(_G, 'jsonReadFile') then
     local data = jsonReadFile(M.FILE)
     if type(data) == 'table' and data.homeBase then
@@ -179,6 +180,7 @@ end
 
 -- Save state to JSON
 function M.saveState()
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if rawget(_G, 'jsonWriteFile') then
     return jsonWriteFile(M.FILE, state, true)
   end
@@ -187,6 +189,7 @@ end
 
 -- Set Home Base location (address-specific, coordinates, or major city)
 function M.setHomeBase(name, lat, lon, kind, address)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   lat, lon = tonumber(lat), tonumber(lon)
   if not lat or not lon then return false, 'Invalid coordinates' end
   state.homeBase = {
@@ -203,6 +206,7 @@ end
 
 -- Set Home Base from a preset major city
 function M.setHomeBaseByCity(cityId)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   for _, c in ipairs(M.CITY_BASES) do
     if c.id == cityId then
       return M.setHomeBase(c.name, c.lat, c.lon, 'city_base')
@@ -213,6 +217,7 @@ end
 
 -- Teleport player directly to Home Base
 function M.teleportToHomeBase()
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   local hb = state.homeBase
   if not hb or not hb.lat then return false, 'No home base defined' end
   return places.goTo(hb.lat, hb.lon, hb.name)
@@ -220,6 +225,7 @@ end
 
 -- Start or plan an overlanding tour (sets transit to trailhead)
 function M.startExpedition(tourId)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if multiplayer() then return broadcastExpedition({type='expedition_start',expeditionId=tourId}), 'pending' end
   local tour = nil
   for _, t in ipairs(M.TOURS) do
@@ -276,6 +282,7 @@ end
 
 -- Teleport directly to the active tour's trailhead
 function M.fastTravelToTrailhead()
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   local tour = state.activeTour
   if not tour or not tour.checkpoints or not tour.checkpoints[1] then
     return false, 'No active trip planned'
@@ -286,6 +293,7 @@ end
 
 -- Officially begin the expedition once at the trailhead
 function M.beginTrail()
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   local tour = state.activeTour
   if not tour then return false, 'No active trip' end
 
@@ -317,6 +325,7 @@ end
 
 -- Abandon active expedition
 function M.abandonExpedition()
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if not state.activeTour then return false end
   local tourId = state.activeTour.id
   if multiplayer() then return broadcastExpedition({type='abandon_expedition',expeditionId=tourId}), 'pending' end
@@ -333,6 +342,7 @@ end
 
 -- Advance to next checkpoint or complete tour
 function M.advanceCheckpoint()
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   local tour = state.activeTour
   if not tour or tour.status ~= 'active' then return false end
 
@@ -395,6 +405,7 @@ end
 
 -- Spawn a ready-to-roll 4x4 Overland Rig (Gavril Roamer 4x4)
 function M.spawnOverlandRig()
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   local pVeh = rawget(_G, 'getPlayerVehicle') and getPlayerVehicle(0)
   local pos = pVeh and pVeh:getPosition() or vec3(0, 0, 50)
   local rot = pVeh and quat(0, 0, 1, 0) * quat(pVeh:getRefNodeRotation()) or quat(0, 0, 0, 1)
@@ -412,6 +423,7 @@ end
 
 -- Spawn a Commercial Semi Truck (Gavril T-Series)
 function M.spawnSemiTruck()
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   local pVeh = rawget(_G, 'getPlayerVehicle') and getPlayerVehicle(0)
   local pos = pVeh and pVeh:getPosition() or vec3(0, 0, 50)
   local rot = pVeh and quat(0, 0, 1, 0) * quat(pVeh:getRefNodeRotation()) or quat(0, 0, 0, 1)
@@ -431,6 +443,7 @@ end
 local lastChkDist = nil
 
 function M.update(playerLat, playerLon)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   local tour = state.activeTour
   if not tour or not playerLat or not playerLon then return end
 
@@ -515,6 +528,7 @@ end
 
 -- Handle remote BeamMP expedition events
 function M.onRemoteExpedition(msg)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if type(msg) ~= 'table' or type(msg.type) ~= 'string' then return end
 
   if msg.type == 'ledger_state' then

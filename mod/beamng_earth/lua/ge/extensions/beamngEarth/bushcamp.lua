@@ -35,6 +35,7 @@ end
 
 -- Deploy camp at current vehicle location
 function M.deployCamp(playerLat, playerLon, playerVeh)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if campState.deployed then
     return false, 'Camp already deployed'
   end
@@ -76,6 +77,7 @@ end
 
 -- Pack up camp and get back on the trail
 function M.packCamp(playerVeh)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   if not campState.deployed then
     return false, 'No camp currently deployed'
   end
@@ -103,6 +105,7 @@ end
 
 -- Rest by the campfire: advances time of day, wipes fatigue, and grants explorer buff
 function M.restAtCamp(hours)
+  if not require('beamngEarth/logistics').enabled() then return false, 'OTBT logistics disabled' end
   hours = hours or 8
   if not campState.deployed then
     return false, 'Must deploy camp first to rest by campfire'
