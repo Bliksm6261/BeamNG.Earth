@@ -45,16 +45,16 @@ end
 -- 2. Regional & Diurnal Weather Detection
 --------------------------------------------------------------------------------
 do
-  -- Johannesburg Highveld in mid-afternoon (tod = 0.65 ~ 15:30)
-  local stormId = aw.detectRegionalWeather(-26.2041, 28.0473, 0.65)
+  -- Johannesburg Highveld in mid-afternoon (tod = 0.15 ~ 15:36)
+  local stormId = aw.detectRegionalWeather(-26.2041, 28.0473, 0.15)
   T.check(stormId == 'highveld_thunderstorm', 'detected Highveld afternoon supercell storm')
 
-  -- Drakensberg Escarpment in early morning (tod = 0.25 ~ 06:00)
-  local fogId = aw.detectRegionalWeather(-29.2000, 29.5000, 0.25)
+  -- Drakensberg Escarpment in early morning (tod = 0.75 ~ 06:00)
+  local fogId = aw.detectRegionalWeather(-29.2000, 29.5000, 0.75)
   T.check(fogId == 'escarpment_fog', 'detected Drakensberg mountain mist')
 
-  -- Kalahari Desert in blazing afternoon (tod = 0.50 ~ 12:00)
-  local dustId = aw.detectRegionalWeather(-24.0000, 18.0000, 0.50)
+  -- Kalahari Desert in blazing afternoon (tod = 0.00 ~ 12:00)
+  local dustId = aw.detectRegionalWeather(-24.0000, 18.0000, 0.00)
   T.check(dustId == 'kalahari_haboob', 'detected Kalahari desert dust haboob')
 end
 
@@ -80,4 +80,10 @@ do
   T.check(st2.mudFriction == 1.0, 'surface friction restored to 1.0 under clear sky')
 end
 
+for ratio, hour in pairs({[0]=12, [0.25]=18, [0.5]=0, [0.75]=6}) do
+  T.check(aw.todToHours(ratio) == hour, 'BeamNG time maps to civil hour ' .. hour)
+end
+T.check(aw.detectRegionalWeather(-26.2, 28, 0.5) == 'savanna_clear', 'no afternoon storm at midnight')
+T.check(aw.detectRegionalWeather(-24, 18, 0.5) == 'karoo_scorcher', 'no daytime dust at midnight')
+T.check(aw.detectRegionalWeather(-29.2, 29.5, 0) == 'savanna_clear', 'no morning mist at noon')
 T.done('test_african_weather')

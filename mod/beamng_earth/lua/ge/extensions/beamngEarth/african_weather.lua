@@ -165,14 +165,21 @@ function M.getActivePreset()
   return activePreset or M.PRESETS[5] -- default savanna clear
 end
 
+-- BeamNG's ratio starts at noon; civil hours start at midnight.
+function M.todToHours(ratio)
+  return ((ratio + 0.5) % 1) * 24
+end
+
 -- Dynamic weather regional detector
 function M.detectRegionalWeather(lat, lon, timeOfDayRatio)
   if not lat or not lon then return M.PRESETS[5].id end
 
+  local hour = timeOfDayRatio and M.todToHours(timeOfDayRatio)
+
   -- 1. Drakensberg / Lesotho / Eastern Highlands (-28 to -31 lat, 27 to 30 lon)
   if lat <= -28.0 and lat >= -31.5 and lon >= 27.5 and lon <= 30.5 then
-    -- High chance of mountain mist in mornings/evenings (timeOfDay < 0.35 or > 0.75)
-    if timeOfDayRatio and (timeOfDayRatio < 0.35 or timeOfDayRatio > 0.75) then
+    -- High chance of mountain mist in mornings/evenings (before 08:24 or after 18:00)
+    if hour and (hour < 8.4 or hour > 18) then
       return 'escarpment_fog'
     end
   end
@@ -180,7 +187,7 @@ function M.detectRegionalWeather(lat, lon, timeOfDayRatio)
   -- 2. Namib & Kalahari Desert regions (lon < 22, lat -20 to -28)
   if lon <= 22.0 and lat <= -19.0 and lat >= -28.5 then
     -- Dust haboob or scorching sun
-    if timeOfDayRatio and (timeOfDayRatio >= 0.40 and timeOfDayRatio <= 0.65) then
+    if hour and (hour >= 9.6 and hour <= 15.6) then
       return 'kalahari_haboob'
     else
       return 'karoo_scorcher'
@@ -189,8 +196,8 @@ function M.detectRegionalWeather(lat, lon, timeOfDayRatio)
 
   -- 3. Highveld / Gauteng / Free State plateau (lat -25 to -28, lon 26 to 29)
   if lat <= -25.0 and lat >= -28.0 and lon >= 26.0 and lon <= 29.5 then
-    -- Mid-afternoon Highveld thunderstorm (timeOfDay between 0.55 and 0.75: ~13:00 - 18:00)
-    if timeOfDayRatio and timeOfDayRatio >= 0.55 and timeOfDayRatio <= 0.75 then
+    -- Mid-afternoon Highveld thunderstorm (13:12 - 18:00)
+    if hour and hour >= 13.2 and hour <= 18 then
       return 'highveld_thunderstorm'
     end
   end
