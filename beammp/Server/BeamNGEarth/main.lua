@@ -24,7 +24,7 @@ local G = {}
 G.SHARE_PORT = 47621
 -- ===================================================================================================================
 
-G.PROTO = 2                 -- (2: anchors for the clients' conversion; 1 grouped players by anchor)
+G.PROTO = 3                 -- (2: anchors for the clients' conversion; 1 grouped players by anchor)
 G.MEET_M = 3000             -- a joining player farther than this from the others is sent to them
 G.STALE_S = 15              -- a player's pose this old: left out
 G.TICK_MS = 2000
@@ -151,176 +151,18 @@ function G.config()
   return { sharePort = (port and port >= 1024 and port <= 65535) and port or nil }
 end
 
--- Shared logistics & expeditions state across players
-G.logistics = {
-  company = {
-    name = 'OTBT Logistics Co-op',
-    vault = 25000,
-    completedDeliveries = 0,
-    totalTonnesHauled = 0,
-    totalEarnings = 0,
-    reputation = 100
-  },
-  activeContract = nil,
-  activeExpedition = nil
-}
-
--- Pure: handle logistics/expedition events from clients
-function G.onLogistics(pid, msg, playerName)
-  if type(msg) ~= 'table' or type(msg.type) ~= 'string' then return nil, nil end
-  playerName = playerName or ('Player ' .. tostring(pid))
-
-  if msg.type == 'sync_request' then
-    return { type = 'sync_state', state = G.logistics }, pid
-  end
-
-  if msg.type == 'set_company_name' then
-    if type(msg.name) == 'string' and #msg.name > 0 and #msg.name <= 64 then
-      G.logistics.company.name = msg.name
-      return { type = 'set_company_name', name = msg.name, playerName = playerName }, -1
-    end
-  end
-
-  if msg.type == 'purchase_upgrade' then
-    local comp = G.logistics.company
-    comp.upgrades = comp.upgrades or {}
-    local upId = tostring(msg.upgradeId)
-    local cost = tonumber(msg.cost) or 0
-    if not comp.upgrades[upId] and (comp.vault or 0) >= cost then
-      comp.vault = comp.vault - cost
-      comp.upgrades[upId] = { purchasedAt = os.time(), cost = cost }
-      return { type = 'purchase_upgrade', upgradeId = upId, cost = cost, company = comp, playerName = playerName }, -1
-    end
-  end
-
-  if msg.type == 'accept' then
-    if type(msg.contract) == 'table' then
-      G.logistics.activeContract = msg.contract
-      return { type = 'accept', contract = msg.contract, slotIndex = msg.slotIndex or 1, playerName = playerName, pid = pid }, -1
-    end
-  end
-
-  if msg.type == 'claim' then
-    local c = G.logistics.activeContract
-    local slotIdx = tonumber(msg.slotIndex)
-    if c and c.slots and slotIdx and c.slots[slotIdx] then
-      c.slots[slotIdx].claimedBy = playerName
-      c.slots[slotIdx].status = 'in_transit'
-      return { type = 'claim', jobId = msg.jobId, slotIndex = slotIdx, playerName = playerName, pid = pid }, -1
-    end
-  end
-
-  if msg.type == 'damage' then
-    local c = G.logistics.activeContract
-    local slotIdx = tonumber(msg.slotIndex)
-    if c and c.slots and slotIdx and c.slots[slotIdx] then
-      c.slots[slotIdx].cargoHealth = tonumber(msg.cargoHealth) or c.slots[slotIdx].cargoHealth
-      c.slots[slotIdx].damagePenalty = tonumber(msg.damagePenalty) or c.slots[slotIdx].damagePenalty
-      return { type = 'damage', jobId = msg.jobId, slotIndex = slotIdx, cargoHealth = c.slots[slotIdx].cargoHealth, damagePenalty = c.slots[slotIdx].damagePenalty, playerName = playerName, pid = pid }, -1
-    end
-  end
-
-  if msg.type == 'deliver_slot' then
-    local c = G.logistics.activeContract
-    local slotIdx = tonumber(msg.slotIndex)
-    if c and c.slots and slotIdx and c.slots[slotIdx] then
-      c.slots[slotIdx].status = 'delivered'
-      c.slots[slotIdx].cargoHealth = tonumber(msg.cargoHealth) or c.slots[slotIdx].cargoHealth
-      c.slots[slotIdx].damagePenalty = tonumber(msg.damagePenalty) or c.slots[slotIdx].damagePenalty
-      return { type = 'deliver_slot', jobId = msg.jobId, slotIndex = slotIdx, playerName = playerName, pid = pid }, -1
-    end
-  end
-
-  if msg.type == 'finalize' then
-    local comp = G.logistics.company
-    local payout = tonumber(msg.netPayout) or 0
-    local tonnes = tonumber(msg.tonnes) or 0
-    comp.vault = comp.vault + payout
-    comp.completedDeliveries = comp.completedDeliveries + 1
-    comp.totalTonnesHauled = comp.totalTonnesHauled + tonnes
-    comp.totalEarnings = comp.totalEarnings + payout
-    if msg.reputationDelta then
-      comp.reputation = math.max(0, math.min(100, comp.reputation + tonumber(msg.reputationDelta)))
-    end
-    G.logistics.activeContract = nil
-    return { type = 'finalize', jobId = msg.jobId, company = comp, netPayout = payout, playerName = playerName }, -1
-  end
-
-  if msg.type == 'refuel' then
-    local cost = tonumber(msg.cost) or 0
-    local comp = G.logistics.company
-    comp.vault = math.max(0, (comp.vault or 0) - cost)
-    return { type = 'refuel', cost = cost, company = comp, playerName = playerName }, -1
-  end
-
-  if msg.type == 'checkpoint_clear' then
-    local fee = tonumber(msg.fee) or 0
-    local fine = tonumber(msg.fine) or 0
-    local totalDeduction = fee + fine
-    local comp = G.logistics.company
-    if totalDeduction > 0 then
-      comp.vault = math.max(0, (comp.vault or 0) - totalDeduction)
-    end
-    return {
-      type = 'checkpoint_clear',
-      checkpointId = msg.checkpointId,
-      checkpointType = msg.checkpointType,
-      name = msg.name,
-      fee = fee,
-      fine = fine,
-      company = comp,
-      playerName = playerName
-    }, -1
-  end
-
-  if msg.type == 'cb_radio' then
-    return {
-      type = 'cb_radio',
-      channel = tonumber(msg.channel) or 19,
-      callsign = tostring(msg.callsign or playerName),
-      message = tostring(msg.message or ''),
-      code = tostring(msg.code or ''),
-      time = os.time(),
-      playerName = playerName,
-      pid = pid
-    }, -1
-  end
-
-  if msg.type == 'abandon' then
-    G.logistics.activeContract = nil
-    return { type = 'abandon', jobId = msg.jobId, playerName = playerName }, -1
-  end
-
-  if msg.type == 'expedition_start' then
-    if type(msg.expedition) == 'table' then
-      G.logistics.activeExpedition = msg.expedition
-      return { type = 'expedition_start', expedition = msg.expedition, playerName = playerName }, -1
-    end
-  end
-
-  if msg.type == 'expedition_stage' then
-    if G.logistics.activeExpedition then
-      G.logistics.activeExpedition.currentCheckpointIndex = tonumber(msg.stage) or G.logistics.activeExpedition.currentCheckpointIndex
-      G.logistics.activeExpedition.status = msg.status or G.logistics.activeExpedition.status
-      return { type = 'expedition_stage', expeditionId = msg.expeditionId, stage = msg.stage, status = msg.status, playerName = playerName }, -1
-    end
-  end
-
-  if msg.type == 'expedition_complete' then
-    G.logistics.activeExpedition = nil
-    return { type = 'expedition_complete', expeditionId = msg.expeditionId, stamp = msg.stamp, playerName = playerName }, -1
-  end
-
-  return nil, nil
-end
+-- Modules are loaded relative to this plugin, independent of the server working directory.
+local pluginDir = debug.getinfo(1, 'S').source:sub(2):match('^(.*[/\\])') or './'
+G.LEDGER_PATH = rawget(_G, 'OTBT_LEDGER_PATH') or (pluginDir .. 'otbt_ledger.json')
+dofile(pluginDir .. 'otbt_ledger.lua')(G, dofile(pluginDir .. 'otbt_economy.lua'), dofile(pluginDir .. 'otbt_json.lua'))
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- BeamMP wiring (absent in the offline tests)
 if MP and MP.RegisterEvent then
-  local function encode(t) return Util.JsonEncode(t) end
+  local function encode(t) return G.encode(t) end
 
   function BNGE_onPose(pid, data)
-    local ok, d = pcall(Util.JsonDecode, data)
+    local ok, d = pcall(G.decode, data)
     if not ok then return end
     local known = G.players[pid] ~= nil
     local place, moved = G.onPose(pid, d, MP.GetPlayerName(pid))
@@ -331,7 +173,7 @@ if MP and MP.RegisterEvent then
     end
     if p and not known then
       MP.TriggerClientEvent(pid, 'bngeConfig', encode(G.config()))
-      MP.TriggerClientEvent(pid, 'bngeLogistics', encode({ type = 'sync_state', state = G.logistics }))
+      MP.TriggerClientEvent(pid, 'bngeLogistics', encode((G.onLogistics(pid, { type = 'sync_request' }, p.name))))
       print(string.format('[BeamNG.Earth] %s at %.5f, %.5f (anchor %s)', tostring(p.name), p.lat, p.lon,
         G.key(p.aLat, p.aLon)))
     end
@@ -347,7 +189,7 @@ if MP and MP.RegisterEvent then
   function BNGE_onLeave(pid) G.onLeave(pid) end
 
   function BNGE_onLogistics(pid, data)
-    local ok, d = pcall(Util.JsonDecode, data)
+    local ok, d = pcall(G.decode, data)
     if not ok or type(d) ~= 'table' then return end
     local p = G.players[pid]
     local pName = (p and p.name) or (MP.GetPlayerName and MP.GetPlayerName(pid)) or ('Player ' .. tostring(pid))

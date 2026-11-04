@@ -9,10 +9,14 @@ local gps = require('beamngEarth/gps')
 M.FILE = '/settings/beamngEarth_expeditions.json'
 M.CHECKPOINT_ARRIVE_M = 45 -- within 45m: checkpoint reached
 
+local ledgerRev = -1
+local function multiplayer()
+  local session=require('beamngEarth/mpsession')
+  return session.isSessionActive and session.isSessionActive()
+end
+
 local function broadcastExpedition(payload)
-  if rawget(_G, 'TriggerServerEvent') and rawget(_G, 'jsonEncode') then
-    pcall(TriggerServerEvent, 'bngeLogistics', jsonEncode(payload))
-  end
+  return require('beamngEarth/mpsession').sendLogisticsEvent(payload)
 end
 
 -- Curated Overlanding Expeditions
@@ -216,6 +220,7 @@ end
 
 -- Start or plan an overlanding tour (sets transit to trailhead)
 function M.startExpedition(tourId)
+  if multiplayer() then return broadcastExpedition({type='expedition_start',expeditionId=tourId}), 'pending' end
   local tour = nil
   for _, t in ipairs(M.TOURS) do
     if t.id == tourId then tour = t; break end
@@ -284,6 +289,8 @@ function M.beginTrail()
   local tour = state.activeTour
   if not tour then return false, 'No active trip' end
 
+  if multiplayer() then return broadcastExpedition({type='expedition_stage',expeditionId=tour.id,stageIndex=2}), 'pending' end
+
   tour.status = 'active'
   tour.startedAt = os.time()
   state.checkpointIndex = 2 -- first trail milestone after trailhead
@@ -312,6 +319,7 @@ end
 function M.abandonExpedition()
   if not state.activeTour then return false end
   local tourId = state.activeTour.id
+  if multiplayer() then return broadcastExpedition({type='abandon_expedition',expeditionId=tourId}), 'pending' end
   state.activeTour = nil
   state.checkpointIndex = 1
   if gps and gps.clear then pcall(gps.clear) end
@@ -328,6 +336,12 @@ function M.advanceCheckpoint()
   local tour = state.activeTour
   if not tour or tour.status ~= 'active' then return false end
 
+  if multiplayer() then
+    if state.checkpointIndex < #tour.checkpoints then
+      return broadcastExpedition({type='expedition_stage',expeditionId=tour.id,stageIndex=state.checkpointIndex+1}), 'pending'
+    end
+    return broadcastExpedition({type='expedition_complete',expeditionId=tour.id}), 'pending'
+  end
   local currentChk = tour.checkpoints[state.checkpointIndex]
   state.passport.milestonesDiscovered = (state.passport.milestonesDiscovered or 0) + 1
 
@@ -503,9 +517,25 @@ end
 function M.onRemoteExpedition(msg)
   if type(msg) ~= 'table' or type(msg.type) ~= 'string' then return end
 
+  if msg.type == 'ledger_state' then
+    if msg.rev and msg.rev <= ledgerRev then return end
+    ledgerRev = msg.rev or ledgerRev
+    state.activeTour = msg.expedition
+    state.checkpointIndex = msg.expedition and msg.expedition.stageIndex or 1
+    if msg.intent == 'expedition_complete' and msg.expeditionId then
+      state.passport.stamps[msg.expeditionId] = {completedAt=os.time()}
+    end
+    local chk = state.activeTour and state.activeTour.checkpoints[state.checkpointIndex]
+    if chk and gps and gps.setDestination then gps.setDestination(chk.lat,chk.lon,chk.name) end
+    M.saveState()
+    return
+  end
   if msg.type == 'sync_state' then
+    ledgerRev = msg.rev or -1
+    state.activeTour = nil
     if msg.state and msg.state.activeExpedition ~= nil then
       state.activeTour = msg.state.activeExpedition
+      state.checkpointIndex = state.activeTour.stageIndex or 1
       M.saveState()
     end
     return

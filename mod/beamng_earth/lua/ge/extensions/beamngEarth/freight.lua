@@ -14,6 +14,13 @@ M.VERSION = 1
 M.EPOCH_INTERVAL_S = 3600 -- contracts rotate every hour (in-game/real-world epoch)
 
 local lastBroadcastPenalty = {}
+local serverJobs = {}
+local ledgerRev, slotRev, ledgerPlayerKey = -1, -1, nil
+local requestedEpoch
+local function multiplayer()
+  local session = require('beamngEarth/mpsession')
+  return session.isSessionActive and session.isSessionActive()
+end
 
 local function broadcastLogistics(payload)
   return require('beamngEarth/mpsession').sendLogisticsEvent(payload)
@@ -349,6 +356,7 @@ function M.getUpgradesList()
 end
 
 function M.purchaseUpgrade(upgradeId)
+  if multiplayer() then return broadcastLogistics({type='purchase_upgrade',upgradeId=upgradeId}), 'pending' end
   local c = companyState.company
   if not c then return false, 'Company not initialized' end
   c.upgrades = c.upgrades or {}
@@ -385,6 +393,7 @@ function M.purchaseUpgrade(upgradeId)
 end
 
 function M.setCompanyName(name)
+  if multiplayer() then return broadcastLogistics({type='set_company_name',name=name}), 'pending' end
   if type(name) ~= 'string' then return false, 'Name must be a string' end
   name = name:match('^%s*(.-)%s*$') or ''
   if #name == 0 then return false, 'Name cannot be empty' end
@@ -427,6 +436,16 @@ end
 
 -- Get current market jobs for the player's coordinate
 function M.getAvailableJobs(lat, lon, epoch)
+  if multiplayer() then
+    local currentEpoch=math.floor(os.time()/3600)
+    if requestedEpoch~=currentEpoch then
+      requestedEpoch=currentEpoch; broadcastLogistics({type='sync_request'})
+    end
+    local hub = M.findNearestHub(lat, lon)
+    local jobs = {}
+    for _, job in ipairs(serverJobs) do if hub and job.origin.name == hub.name then jobs[#jobs+1] = job end end
+    return jobs
+  end
   epoch = epoch or math.floor(os.time() / M.EPOCH_INTERVAL_S)
   local originHub = M.findNearestHub(lat, lon)
   if not originHub then return {} end
@@ -467,6 +486,7 @@ end
 
 -- Accept a contract from the market
 function M.acceptContract(job, playerPid, playerName, slotIndex)
+  if multiplayer() then return broadcastLogistics({type='accept',jobId=job and job.id,slotIndex=slotIndex or 1}), 'pending' end
   if job and job.locked then
     return false, job.lockReason or 'Company lacks required carrier certification'
   end
@@ -508,6 +528,7 @@ end
 
 -- Claim an open consignment slot in an active multi-truck contract
 function M.claimSlot(slotIndex, playerPid, playerName)
+  if multiplayer() then return broadcastLogistics({type='claim',jobId=companyState.activeContract and companyState.activeContract.id,slotIndex=slotIndex}), 'pending' end
   local c = companyState.activeContract
   if not c or c.status ~= 'in_transit' then return false, 'No active contract in transit' end
   if slotIndex < 1 or slotIndex > c.trucksRequired then return false, 'Invalid slot' end
@@ -532,6 +553,7 @@ end
 
 -- Record cargo damage on a claimed slot
 function M.recordDamage(slotIndex, damagePercent)
+  if multiplayer() then return broadcastLogistics({type='damage',jobId=companyState.activeContract and companyState.activeContract.id,slotIndex=slotIndex,cargoHealth=math.max(0,100-damagePercent)}) end
   local c = companyState.activeContract
   if not c or not c.slots[slotIndex] then return false end
   local slot = c.slots[slotIndex]
@@ -554,6 +576,7 @@ end
 
 -- Complete delivery for a slot
 function M.deliverSlot(slotIndex, precisionDock)
+  if multiplayer() then return broadcastLogistics({type='deliver_slot',jobId=companyState.activeContract and companyState.activeContract.id,slotIndex=slotIndex,cargoHealth=companyState.activeContract and companyState.activeContract.slots[slotIndex] and companyState.activeContract.slots[slotIndex].cargoHealth}), 'pending' end
   local c = companyState.activeContract
   if not c or not c.slots[slotIndex] then return false, 'Invalid slot' end
   local slot = c.slots[slotIndex]
@@ -609,6 +632,7 @@ end
 
 -- Finalize entire contract, deposit to company treasury, update stats
 function M.finalizeContract()
+  if multiplayer() then return broadcastLogistics({type='finalize',jobId=companyState.activeContract and companyState.activeContract.id}), 'pending' end
   local c = companyState.activeContract
   if not c then return false, 'No active contract' end
   for _, slot in ipairs(c.slots) do
@@ -742,6 +766,7 @@ function M.refuelVehicle(lat, lon)
     return false, 'Must be near a town or Home Base with at least 5L fuel deficit'
   end
 
+  if multiplayer() then return broadcastLogistics({type='refuel',litres=math.max(0,driverStatus.tankCapacityLiters-driverStatus.fuelLiters)}), 'pending' end
   local comp = companyState.company
   if (comp.vault or 0) < status.refillCost then
     return false, string.format("Insufficient company funds ($%d needed)", status.refillCost)
@@ -840,7 +865,7 @@ function M.update(playerLat, playerLon, playerVeh)
         end
         -- Find our claimed slot (default to slot 1 if solo)
         for sIdx, slot in ipairs(c.slots) do
-          if slot.status == 'in_transit' then
+          if slot.status == 'in_transit' and (not multiplayer() or slot.claimedKey == ledgerPlayerKey) then
             M.recordDamage(sIdx, damagePercent)
             break
           end
@@ -868,7 +893,7 @@ function M.update(playerLat, playerLon, playerVeh)
         if c.wasCoupledOnArrival == nil then
           c.wasCoupledOnArrival = coupledNow
         elseif c.wasCoupledOnArrival and not coupledNow and speed < 0.5 then
-          if not c.precisionDockCompleted then
+          if not c.precisionDockCompleted and not multiplayer() then
             c.precisionDockCompleted = true
             if rawget(_G, 'ui_message') then
               pcall(ui_message, "🅿️ PRECISION DOCK COMPLETE! Trailer uncoupled in loading bay (+20% Payout Bonus).", 8, 'beamngEarthFreight')
@@ -943,6 +968,7 @@ end
 
 -- Abandon contract
 function M.abandonContract()
+  if multiplayer() then return broadcastLogistics({type='abandon',jobId=companyState.activeContract and companyState.activeContract.id}), 'pending' end
   local c = companyState.activeContract
   if not c then return false end
   broadcastLogistics({
@@ -959,7 +985,47 @@ end
 function M.onRemoteLogistics(msg)
   if type(msg) ~= 'table' or type(msg.type) ~= 'string' then return end
 
+  if msg.type == 'slot_state' then
+    if msg.rev and msg.rev < math.max(ledgerRev, slotRev) then return end
+    slotRev = msg.rev or slotRev
+    if companyState.activeContract and msg.contract and companyState.activeContract.id ~= msg.contract.id then return end
+    if msg.contract then
+      companyState.activeContract = msg.contract.status == 'in_transit' and msg.contract or nil
+      for _, slot in ipairs(msg.contract.slots) do if slot.status == 'claimed' then slot.status = 'in_transit' end end
+    end
+    return
+  end
+  if msg.type == 'ledger_state' then
+    if msg.rev and msg.rev <= ledgerRev then return end
+    ledgerRev = msg.rev or ledgerRev
+    ledgerPlayerKey = msg.playerKey or ledgerPlayerKey
+    if checkpoints and checkpoints.onRemoteLogistics then checkpoints.onRemoteLogistics(msg) end
+    if msg.jobs then serverJobs = msg.jobs end
+    if msg.company then companyState.company = msg.company end
+    companyState.activeContract = msg.contract and msg.contract.status == 'in_transit' and msg.contract or nil
+    if companyState.activeContract then
+      for _, slot in ipairs(companyState.activeContract.slots) do if slot.status == 'claimed' then slot.status = 'in_transit' end end
+      if msg.intent == 'accept' and gps and gps.setDestination then
+        local dest = companyState.activeContract.destination
+        gps.setDestination(dest.lat, dest.lon, dest.name)
+      end
+    end
+    if msg.intent == 'refuel' then
+      driverStatus.fuelLiters = driverStatus.tankCapacityLiters; driverStatus.fuelPercent = 100
+      local veh = rawget(_G, 'getPlayerVehicle') and getPlayerVehicle(0)
+      if veh then veh:queueLuaCommand("if energyStorage then for _, s in pairs(energyStorage.getStorages()) do if s.type == 'fuelTank' then s:setRemainingRatio(1.0) end end end") end
+    end
+    M.saveState()
+    return
+  end
   if msg.type == 'sync_state' then
+    ledgerRev, slotRev = msg.rev or -1, msg.rev or -1
+    ledgerPlayerKey = msg.playerKey
+    serverJobs = msg.jobs or {}
+    companyState.activeContract = nil
+    if msg.state and msg.state.activeContract then
+      for _, slot in ipairs(msg.state.activeContract.slots) do if slot.status == 'claimed' then slot.status = 'in_transit' end end
+    end
     if msg.state and type(msg.state.company) == 'table' then
       companyState.company = msg.state.company
     end
@@ -969,6 +1035,8 @@ function M.onRemoteLogistics(msg)
     M.saveState()
     return
   end
+
+  if multiplayer() and msg.type ~= 'cb_radio' then return end
 
   if msg.type == 'purchase_upgrade' then
     if msg.company then
@@ -1102,6 +1170,8 @@ end
 
 -- Reset session
 function M.reset()
+  ledgerRev, slotRev, ledgerPlayerKey = -1, -1, nil
+  serverJobs, requestedEpoch = {}, nil
   companyState.activeContract = nil
   driverStatus.fatiguePercent = 0.0
   driverStatus.fuelPercent = 100.0

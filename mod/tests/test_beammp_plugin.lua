@@ -3,6 +3,8 @@
 -- the clients' position conversion, sent at once when an anchor changes; a joining player sent to the others.
 local dir = (arg[0]:match('^(.*)[/\\]') or '.')
 local T = dofile(dir .. '/testlib.lua')
+OTBT_LEDGER_PATH = os.tmpname()
+os.remove(OTBT_LEDGER_PATH)
 local G = dofile(dir .. '/../../beammp/Server/BeamNGEarth/main.lua')
 
 local M_PER_DEG = 111194.9     -- (G.dist's sphere)
@@ -71,90 +73,12 @@ T.check(next(G.tick(0)) == nil, 'no pose for STALE_S: left out')
 G.onLeave(1)
 T.check(G.players[1] == nil, 'left: forgotten')
 
--- logistics and expedition multiplayer event handling (G.onLogistics)
-do
-  -- 1. sync_request
-  local rep, target = G.onLogistics(2, { type = 'sync_request' }, 'player2')
-  T.check(rep and rep.type == 'sync_state' and target == 2, 'sync_request returns state targeted to player')
-  T.check(rep.state and rep.state.company and rep.state.company.vault == 25000, 'initial vault state in sync')
-
-  -- 2. accept contract
-  local testJob = {
-    id = '#TST-101',
-    trucksRequired = 2,
-    slots = {
-      { slot = 1, status = 'in_transit', claimedBy = 'Alpha' },
-      { slot = 2, status = 'open', claimedBy = nil }
-    }
-  }
-  rep, target = G.onLogistics(1, { type = 'accept', contract = testJob, slotIndex = 1 }, 'Alpha')
-  T.check(rep and rep.type == 'accept' and target == -1, 'accept broadcasts to all players (-1)')
-  T.check(G.logistics.activeContract ~= nil and G.logistics.activeContract.id == '#TST-101', 'server stored active contract')
-
-  -- 3. claim slot 2
-  rep, target = G.onLogistics(2, { type = 'claim', jobId = '#TST-101', slotIndex = 2 }, 'Bravo')
-  T.check(rep and rep.type == 'claim' and target == -1, 'claim broadcasts to all players')
-  T.check(G.logistics.activeContract.slots[2].claimedBy == 'Bravo', 'server updated slot 2 owner')
-
-  -- 4. damage update
-  rep, target = G.onLogistics(2, { type = 'damage', jobId = '#TST-101', slotIndex = 2, cargoHealth = 85, damagePenalty = 1500 }, 'Bravo')
-  T.check(rep and rep.type == 'damage' and target == -1, 'damage broadcasts to all players')
-  T.check(G.logistics.activeContract.slots[2].damagePenalty == 1500, 'server recorded penalty')
-
-  -- 5. deliver slot
-  rep, target = G.onLogistics(1, { type = 'deliver_slot', jobId = '#TST-101', slotIndex = 1 }, 'Alpha')
-  T.check(rep and rep.type == 'deliver_slot' and target == -1, 'deliver_slot broadcast')
-  T.check(G.logistics.activeContract.slots[1].status == 'delivered', 'server updated slot 1 delivered')
-
-  -- 6. finalize contract
-  local initVault = G.logistics.company.vault
-  rep, target = G.onLogistics(2, { type = 'finalize', jobId = '#TST-101', netPayout = 12000, tonnes = 40, reputationDelta = 2 }, 'Bravo')
-  T.check(rep and rep.type == 'finalize' and target == -1, 'finalize broadcast')
-  T.check(G.logistics.activeContract == nil, 'active contract cleared on finalize')
-  T.check(G.logistics.company.vault == initVault + 12000, 'server company vault credited')
-  T.check(G.logistics.company.completedDeliveries == 1, 'delivery count incremented')
-
-  -- 7. expedition events
-  local testTour = { id = 'tour_test', checkpoints = { { name = 'Start' }, { name = 'End' } } }
-  rep, target = G.onLogistics(1, { type = 'expedition_start', expedition = testTour }, 'Alpha')
-  T.check(rep and rep.type == 'expedition_start' and target == -1, 'expedition_start broadcast')
-  T.check(G.logistics.activeExpedition ~= nil, 'server stored active expedition')
-
-  rep, target = G.onLogistics(1, { type = 'expedition_stage', expeditionId = 'tour_test', stage = 2, status = 'active' }, 'Alpha')
-  T.check(rep and rep.type == 'expedition_stage' and target == -1, 'expedition_stage broadcast')
-  T.check(G.logistics.activeExpedition.currentCheckpointIndex == 2, 'server updated checkpoint index')
-
-  rep, target = G.onLogistics(1, { type = 'expedition_complete', expeditionId = 'tour_test' }, 'Alpha')
-  T.check(rep and rep.type == 'expedition_complete' and target == -1, 'expedition_complete broadcast')
-  T.check(G.logistics.activeExpedition == nil, 'active expedition cleared on complete')
-
-  -- 8. set_company_name
-  rep, target = G.onLogistics(1, { type = 'set_company_name', name = 'Kalahari Express' }, 'Alpha')
-  T.check(rep and rep.type == 'set_company_name' and target == -1, 'set_company_name broadcast')
-  T.check(G.logistics.company.name == 'Kalahari Express', 'server updated group name')
-
-  -- 9. purchase_upgrade
-  G.logistics.company.vault = 80000
-  rep, target = G.onLogistics(1, { type = 'purchase_upgrade', upgradeId = 'license_hazmat', cost = 35000 }, 'Alpha')
-  T.check(rep and rep.type == 'purchase_upgrade' and target == -1, 'purchase_upgrade broadcast')
-  T.check(G.logistics.company.upgrades['license_hazmat'] ~= nil, 'server stored upgrade')
-  T.check(G.logistics.company.vault == 45000, 'server vault deducted for upgrade')
-
-  -- 10. refuel
-  rep, target = G.onLogistics(1, { type = 'refuel', cost = 500 }, 'Alpha')
-  T.check(rep and rep.type == 'refuel' and target == -1, 'refuel broadcast to convoy')
-  T.check(G.logistics.company.vault == 44500, 'server deducted refuel cost from vault')
-
-  -- 11. checkpoint_clear
-  rep, target = G.onLogistics(1, { type = 'checkpoint_clear', checkpointId = 'toll_mooi_river', fee = 38, fine = 0, name = 'Mooi River Toll' }, 'Alpha')
-  T.check(rep and rep.type == 'checkpoint_clear' and target == -1, 'checkpoint_clear broadcast to convoy')
-  T.check(G.logistics.company.vault == 44500 - 38, 'server deducted toll fee from vault')
-
-  -- 12. cb_radio
-  rep, target = G.onLogistics(1, { type = 'cb_radio', channel = 19, callsign = 'Alpha Lead', message = '10-4, rolling out', code = '10-4' }, 'Alpha')
-  T.check(rep and rep.type == 'cb_radio' and target == -1, 'cb_radio broadcast across server')
-  T.check(rep.channel == 19, 'cb_radio channel preserved')
-  T.check(rep.message == '10-4, rolling out', 'cb_radio message delivered')
-end
-
+-- Per-player sync and existing CB radio remain targeted/broadcast respectively.
+local rep, target = G.onLogistics(2, {type='sync_request'}, 'player2')
+T.check(rep.type=='sync_state' and target==2, 'sync targets sender')
+T.check(rep.state.company.vault==25000 and #rep.jobs>0, 'sync includes company and server board')
+rep, target = G.onLogistics(1, {type='cb_radio',channel=19,callsign='Alpha Lead',message='10-4, rolling out',code='10-4'}, 'Alpha')
+T.check(rep.type=='cb_radio' and target==-1, 'CB radio broadcasts')
+T.check(rep.channel==19 and rep.message=='10-4, rolling out', 'CB radio fields preserved')
+os.remove(OTBT_LEDGER_PATH)
 T.done('test_beammp_plugin')

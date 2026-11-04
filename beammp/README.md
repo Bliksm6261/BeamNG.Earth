@@ -72,3 +72,53 @@ The official Off the Beaten Track server is deployed at:
   `Resources/Server/BeamNGEarth/main.lua` and restart the server: every player who joins gets it. A player can still
   pick their own with the environment variable `BNGE_SHARE_PORT`.
 - Players far apart (another country) each build their own world and don't see each other's cars until they meet.
+
+## Protocol 3 economy
+
+Deploy all four Lua files in `Server/BeamNGEarth` together with the updated client.
+The plugin saves `otbt_ledger.json` beside `main.lua`. Set `G.LEDGER_PATH` in
+`main.lua` before module initialization to change it (or set the
+`OTBT_LEDGER_PATH` Lua global before loading the plugin). The directory must
+exist and be writable. Tests use temporary paths. Writes use `.tmp` and rename;
+write failures are logged and retain the in-memory balance. Invalid ledgers are
+moved to `.bad` before starting fresh. Back up the ledger independently of mod
+releases.
+
+All economy messages use `bngeLogistics`. Mutations require a fresh string
+`opId` (1–128 bytes). Replays return the saved reply without applying changes.
+Clients send these intents:
+
+| Type | Fields |
+| --- | --- |
+| `sync_request` | None; reply includes personal company, active contract/expedition and server job board |
+| `accept` | `jobId`, optional `slotIndex` (defaults to 1) |
+| `claim`, `damage`, `deliver_slot` | `jobId` or `contractId`, `slotIndex`; optional `cargoHealth` for damage/delivery |
+| `finalize`, `abandon` | `jobId` or `contractId` |
+| `purchase_upgrade` | `upgradeId` |
+| `refuel` | `litres` (>0, max 400; $1.85/L, rounded down) |
+| `checkpoint_clear` | `checkpointId` |
+| `set_company_name` | `name` (control characters removed, capped at 64 bytes) |
+| `expedition_start`, `expedition_complete`, `abandon_expedition` | `expeditionId` |
+| `expedition_stage` | `expeditionId`, sequential `stageIndex` |
+| `cb_radio` | Existing `channel`, `callsign`, `message`, `code` fields; no `opId` required |
+
+Prices and contract tables from clients are ignored. Server-generated IDs encode
+hour, hub and board position; accept resolves only the current hour. Accepted
+contracts retain their prices across rotations/restarts. Co-op participants get
+`slot_state` broadcasts; affected players get personal `ledger_state` replies
+with `company`, `contract`, `expedition`, `playerKey`, `rev`, `opId`, and `intent`.
+Clients ignore older revisions so saved operation replies cannot roll back state. Completing the last
+slot automatically pays the accepter, regardless of who delivered that slot.
+Company vaults are never shared in broadcasts. Single-player keeps local pricing
+and accounting.
+
+Limits: delivery, damage and expedition progress are still player reports; the
+server validates ownership and progression but has no authoritative vehicle or
+location telemetry. Precision docking pays no bonus until it can be verified.
+Checkpoint clearances charge catalog toll/customs/weigh fees once per player per
+hour; they have no cash reward. Expeditions currently have zero cash reward and
+complete once per expedition ID across the server. MP fuel uses the standard
+price without the local Home Base discount. Operation results, paid IDs, and
+contracts are retained without pruning. The JSON file is a single-process store;
+a failed write can lose recent changes after a crash. Guest identities follow
+player names and have no protection against name reuse.

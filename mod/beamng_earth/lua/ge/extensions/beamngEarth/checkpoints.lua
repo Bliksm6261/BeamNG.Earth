@@ -203,6 +203,20 @@ local lastClearedId = nil
 local lastClearedTime = 0
 local approachWarned = {}
 local stopDuration = 0
+local clearedEpoch = {}
+local function canClear(id, now)
+  local session = require('beamngEarth/mpsession')
+  if session.isSessionActive and session.isSessionActive() then
+    return clearedEpoch[id] ~= math.floor(now / 3600)
+  end
+  return lastClearedId ~= id or now - lastClearedTime > 60
+end
+function M.onRemoteLogistics(msg)
+  if msg.type == 'ledger_state' and msg.intent == 'checkpoint_clear' and msg.checkpointId then
+    lastClearedId = msg.checkpointId; lastClearedTime = os.time()
+    clearedEpoch[msg.checkpointId] = math.floor(lastClearedTime / 3600)
+  end
+end
 
 -- Helper: Find nearest checkpoint
 function M.findNearestCheckpoint(lat, lon)
@@ -237,6 +251,10 @@ function M.clearCheckpoint(cpId, playerLat, playerLon)
     if c.id == cpId then cp = c; break end
   end
   if not cp then return false, 'Checkpoint not found' end
+  local session = require('beamngEarth/mpsession')
+  if session.isSessionActive and session.isSessionActive() then
+    return session.sendLogisticsEvent({type='checkpoint_clear',checkpointId=cp.id}), 'pending'
+  end
 
   local fr = getFreight()
   local comp = fr and fr.getCompany and fr.getCompany() or { vault = 10000, reputation = 100 }
@@ -373,7 +391,7 @@ function M.update(playerLat, playerLon, playerVeh)
     activeNearby = {
       checkpoint = cp,
       distanceM = math.floor(dist + 0.5),
-      canClear = (dist <= 35) and (lastClearedId ~= cp.id or (now - lastClearedTime > 60))
+      canClear = (dist <= 35) and canClear(cp.id, now)
     }
 
     -- Auto-clear if vehicle stopped in lane for > 2 seconds
@@ -410,13 +428,14 @@ function M.getUiState(playerLat, playerLon)
       distanceM = math.floor(dist + 0.5),
       fee = cp.standardFee or 0,
       icon = cp.icon,
-      canClear = (dist <= 35) and (lastClearedId ~= cp.id or (os.time() - lastClearedTime > 60))
+      canClear = (dist <= 35) and canClear(cp.id, os.time())
     } or nil,
     allCheckpoints = M.CHECKPOINTS
   }
 end
 
 function M.reset()
+  clearedEpoch = {}
   activeNearby = nil
   lastClearedId = nil
   lastClearedTime = 0

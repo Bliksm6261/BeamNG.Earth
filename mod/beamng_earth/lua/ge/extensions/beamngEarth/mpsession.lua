@@ -21,7 +21,7 @@
 -- BeamMP's files are not changed: its client events, its own functions, and mpanchor's wrap of positionGE.handle.
 local M = {}
 
-M.PROTO = 2                 -- as the plugin's G.PROTO
+M.PROTO = 3                 -- as the plugin's G.PROTO
 M.POSE_S = 2
 M.HIDE_S = 0.5
 M.GOTO_OFFSET_M = 12        -- a joining player lands this far from the one it goes to (not on top of it)
@@ -694,9 +694,27 @@ function M.getPeers()
   return out
 end
 
+function M.isSessionActive()
+  return require('beamngEarth/beammp').inSession()
+end
+
+local opCounter = 0
+local opSession = tostring(os.time()) .. ':' .. tostring({})
 function M.sendLogisticsEvent(payload)
   if type(payload) ~= 'table' or not rawget(_G, 'TriggerServerEvent')
       or not rawget(_G, 'jsonEncode') then return false end
+  if M.isSessionActive() then
+    opCounter = opCounter + 1
+    local intent = { opId = opSession .. ':' .. opCounter }
+    for _, field in ipairs({'type','jobId','contractId','slotIndex','upgradeId','checkpointId',
+        'expeditionId','stageIndex','litres','cargoHealth','name','channel','callsign','message','code'}) do
+      intent[field] = payload[field]
+    end
+    if payload.contract then intent.jobId = payload.contract.id end
+    if payload.expedition then intent.expeditionId = payload.expedition.id end
+    intent.stageIndex = payload.stageIndex or payload.stage
+    payload = intent
+  end
   local ok, data = pcall(jsonEncode, payload)
   if not ok then return false end
   return pcall(TriggerServerEvent, 'bngeLogistics', data)
