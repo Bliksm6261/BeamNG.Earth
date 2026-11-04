@@ -56,6 +56,8 @@ class EndToEndTest(unittest.TestCase):
         self.assertTrue(vfs.startswith("/temp/beamngEarth/"))
         return os.path.join(self.user, vfs.lstrip("/"))
 
+    @unittest.skipUnless(os.environ.get("BNGE_TEST_NETWORK") == "1",
+                         "real DEM downloads require network; set BNGE_TEST_NETWORK=1")
     def test_session(self):
         c, far = self.c, FarState()
         c.send({"type": "hello", "protocol": 4, "format": 3, "modVersion": "0.4.0"})

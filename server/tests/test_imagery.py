@@ -3,7 +3,7 @@ texel), the source chain with coverage detection (404 / blank tiles), the disk c
 remembered 404s (and their TTL), unreachable sources (netfetch circuit breakers), prefetch
 priorities, the tone curve and the DXT1 DDS with its mip chain. Synthetic tile servers behind a
 netfetch.Fetcher with a fake transport, no network, except NetworkImageryTest (a few real tiles,
-cached in <tmp>/beamng-earth-test-cache/imagery; skipped when offline)."""
+cached in <tmp>/beamng-earth-test-cache/imagery; opt in with BNGE_TEST_NETWORK=1)."""
 import io
 import math
 import os
@@ -870,6 +870,8 @@ class DdsTest(unittest.TestCase):
             self.assertEqual(len(imagery.encode_dds(np.zeros((px, px, 3), np.uint8))), want)
 
 
+@unittest.skipUnless(os.environ.get("BNGE_TEST_NETWORK") == "1",
+                     "real imagery services require network; set BNGE_TEST_NETWORK=1")
 class NetworkImageryTest(unittest.TestCase):
     """Real sources (a handful of tiles, cached across runs)."""
 
