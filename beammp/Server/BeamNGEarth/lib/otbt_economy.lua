@@ -1,5 +1,10 @@
 -- Server catalog. Keep pricing/generation aligned with freight.lua and places.SEED.
 local M = {}
+M.TRANSIT_SPEED_KMH = 100
+M.MIN_TRANSIT_SECONDS = 120
+function M.minimumTransitSeconds(contract)
+  return math.max(M.MIN_TRANSIT_SECONDS, math.ceil((contract.distanceKm or 0) / M.TRANSIT_SPEED_KMH * 3600))
+end
 local places = {}
 places.SEED = {
   { name = 'Johannesburg', lat = -26.2041, lon = 28.0473 },

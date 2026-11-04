@@ -72,7 +72,13 @@ rm -rf "$SRC/dist"
 (cd "$SRC" && python3 tools/package.py --beammp --out dist >/dev/null)
 ZIP=$(ls "$SRC"/dist/*BeamMP-Server*.zip | head -1)
 echo "   $ZIP"
+# Remove legacy auto-run helpers when upgrading; data/ is preserved.
+for helper in otbt_economy otbt_json otbt_ledger; do
+  rm -f "$DIR/Resources/Server/BeamNGEarth/$helper.lua"
+done
 unzip -o -q "$ZIP" -d "$DIR"
+mkdir -p "$DIR/Resources/Server/BeamNGEarth/data"
+test -f "$DIR/Resources/Server/BeamNGEarth/lib/otbt_ledger.lua"
 
 if [ ! -f "$DIR/ServerConfig.toml" ]; then
   # asked here when not given: typed at this prompt it stays out of the process list (sudo AUTHKEY=... shows in ps)

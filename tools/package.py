@@ -72,6 +72,8 @@ def beammp_zip(out_dir, ver):
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         z.writestr("Resources/Client/beamng_earth.zip", mod.getvalue(), zipfile.ZIP_STORED)
         for rel in tree_files("beammp/Server"):
+            if "/data/" in rel or "otbt_ledger.json" in rel:
+                continue
             z.write(os.path.join(ROOT, "beammp/Server", rel), f"Resources/Server/{rel}")
         z.write(os.path.join(ROOT, "beammp/README.md"), "BeamNG.Earth-README.md")
     print(f"{path}: {os.path.getsize(path) / 1e6:.1f} MB")

@@ -153,8 +153,8 @@ end
 
 -- Modules are loaded relative to this plugin, independent of the server working directory.
 local pluginDir = debug.getinfo(1, 'S').source:sub(2):match('^(.*[/\\])') or './'
-G.LEDGER_PATH = rawget(_G, 'OTBT_LEDGER_PATH') or (pluginDir .. 'otbt_ledger.json')
-dofile(pluginDir .. 'otbt_ledger.lua')(G, dofile(pluginDir .. 'otbt_economy.lua'), dofile(pluginDir .. 'otbt_json.lua'))
+G.LEDGER_PATH = rawget(_G, 'OTBT_LEDGER_PATH') or (pluginDir .. 'data/otbt_ledger.json')
+dofile(pluginDir .. 'lib/otbt_ledger.lua')(G, dofile(pluginDir .. 'lib/otbt_economy.lua'), dofile(pluginDir .. 'lib/otbt_json.lua'))
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- BeamMP wiring (absent in the offline tests)

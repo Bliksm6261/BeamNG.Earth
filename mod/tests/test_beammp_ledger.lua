@@ -1,7 +1,7 @@
 local dir=(arg[0]:match('^(.*)[/\\]') or '.')
 local T=dofile(dir..'/testlib.lua')
 local plugin=dir..'/../../beammp/Server/BeamNGEarth/'
-local json=dofile(plugin..'otbt_json.lua')
+local json=dofile(plugin..'lib/otbt_json.lua')
 OTBT_LEDGER_PATH=os.tmpname(); os.remove(OTBT_LEDGER_PATH)
 local ids={[1]='account-A',[2]='account-B'}
 local sent={}
@@ -10,15 +10,18 @@ MP={GetPlayerIdentifiers=function(pid) return {beammp=ids[pid]} end,
 Util={JsonEncode=json.encode,JsonDecode=json.decode}
 local G=dofile(plugin..'main.lua')
 G.players={[1]={name='A'},[2]={name='B'}}
+local clock=os.time()
+G.now=function() return clock end
 local counter=0
 local function intent(pid,t,fields,op)
+  clock=clock+1
   counter=counter+1
   local m=fields or {}; m.type=t; m.opId=op or tostring(counter)
   return G.onLogistics(pid,m,pid==1 and 'A' or 'B')
 end
 local function company(pid) return G.account(pid,pid==1 and 'A' or 'B').company end
 local function job(trucks)
-  for _, j in ipairs(G.economy.board(math.floor(os.time()/3600),company(1).upgrades)) do
+  for _, j in ipairs(G.economy.board(math.floor(clock/3600),company(1).upgrades)) do
     if not j.locked and j.trucksRequired==trucks and not G.ledger.contracts[j.id] then return j end
   end
   error('no suitable job')
@@ -41,19 +44,31 @@ T.check(r and r.contract.owner=='account-A' and r.contract.totalPayout==j.totalP
 local c=G.ledger.contracts[j.id]
 T.check(c.slots[1].status=='claimed' and c.slots[2].status=='open','accept slot states')
 T.check(sent[#sent].data.type=='slot_state','slot changes broadcast')
+T.check(sent[#sent].data.contract.slots[1].claimedKey==nil and sent[#sent].data.contract.owner==nil
+  and sent[#sent].data.contract.slots[1].claimedBy=='A','broadcast hides identity and retains name')
+T.check(c.slots[1].claimedAt==clock,'server records accept time')
+T.check(not intent(1,'deliver_slot',{jobId=j.id,slotIndex=1}),'instant delivery rejected')
+T.check(not intent(1,'claim',{jobId=j.id,slotIndex=2}),'one undelivered slot per player')
+T.check(not intent(1,'accept',{jobId=job(1).id}),'cannot accept another contract while holding a slot')
 T.check(not intent(2,'abandon',{jobId=j.id}), 'B cannot abandon A contract')
 T.check(not intent(2,'finalize',{jobId=j.id,netPayout=99999999}), 'B cannot finalize A contract')
 T.check(not intent(2,'deliver_slot',{jobId=j.id,slotIndex=1}), 'B cannot deliver A slot')
 T.check(not intent(2,'damage',{jobId=j.id,slotIndex=1,cargoHealth=0}), 'B cannot damage A slot')
 T.check(intent(2,'claim',{jobId=j.id,slotIndex=2})~=nil,'co-op claim succeeds')
+T.check(c.slots[2].claimedAt==clock,'claim records server time')
 T.check(not intent(1,'claim',{jobId=j.id,slotIndex=2}),'claimed slot cannot be stolen')
 intent(2,'damage',{jobId=j.id,slotIndex=2,cargoHealth=60,damagePenalty=-1e9})
 local penalty=G.economy.calculatePenalty(c.slots[2],c.cargo,{})
 intent(2,'damage',{jobId=j.id,slotIndex=2,cargoHealth=100})
 T.check(c.slots[2].cargoHealth==60 and c.slots[2].damagePenalty==penalty,'health cannot recover, penalty server priced')
 T.check(not intent(1,'finalize',{jobId=j.id,netPayout=99999999}),'premature finalize rejected')
+local minimum=G.economy.minimumTransitSeconds(c)
+T.check(minimum>=120 and minimum>=c.distanceKm/100*3600,'transit derived from distance and floor')
+clock=c.slots[1].claimedAt+minimum-2
+T.check(not intent(1,'deliver_slot',{jobId=j.id,slotIndex=1}),'delivery one second before minimum rejected')
 local before=company(1).vault
-intent(1,'deliver_slot',{jobId=j.id,slotIndex=1,netPayout=99999999,dockBonus=99999999,precisionDock=true})
+T.check(intent(1,'deliver_slot',{jobId=j.id,slotIndex=1,netPayout=99999999,dockBonus=99999999,precisionDock=true})~=nil,'delivery at exact minimum accepted')
+clock=math.max(clock,c.slots[2].claimedAt+minimum)
 T.check(company(1).vault==before,'partial delivery pays nothing')
 local last=intent(2,'deliver_slot',{jobId=j.id,slotIndex=2,netPayout=99999999},'last-delivery')
 T.check(last.rev==G.ledger.rev,'stored reply revision matches committed ledger')
@@ -93,9 +108,9 @@ T.check(company(1).vault==vault-cp.standardFee,'forged checkpoint reward ignored
 T.check(not intent(1,'checkpoint_clear',{checkpointId=cp.id}),'checkpoint once per epoch/player')
 T.check(intent(2,'checkpoint_clear',{checkpointId=cp.id})~=nil,'checkpoint independent per player')
 local realTime=os.time
-os.time=function() return realTime()+3600 end
+clock=clock+3600
 T.check(intent(1,'checkpoint_clear',{checkpointId=cp.id})~=nil,'checkpoint available in next epoch')
-os.time=realTime
+clock=clock-3600
 local oldName=company(1).name
 intent(2,'set_company_name',{name='B\nCompany',company={name='A stolen'},playerKey='account-A'})
 T.check(company(1).name==oldName and company(2).name=='BCompany','rename only sender, strips controls')
@@ -130,6 +145,7 @@ G.saveLedger()
 vault=company(1).vault
 local file=io.open(OTBT_LEDGER_PATH,'r'); T.check(file~=nil,'ledger written'); if file then file:close() end
 G=dofile(plugin..'main.lua')
+G.now=function() return clock end
 T.check(company(1).vault==vault and G.ledger.paid['contract:'..j.id],'reload restores balance and paid set')
 T.check(not intent(1,'finalize',{jobId=j.id}),'restart cannot repay contract')
 T.check(not intent(1,'checkpoint_clear',{checkpointId=cp.id}),'restart retains checkpoint paid protection')
@@ -149,11 +165,13 @@ T.check(f and f:read('*a')=='{corrupt','corrupt ledger preserved'); if f then f:
 f=assert(io.open(OTBT_LEDGER_PATH,'w')); f:write(json.encode({rev=1,players={broken={}},contracts={},paid={}})); f:close()
 G=dofile(plugin..'main.lua')
 T.check(next(G.ledger.players)==nil,'invalid ledger schema starts fresh')
-G.LEDGER_PATH=OTBT_LEDGER_PATH..'/missing/ledger.json'
+local open=io.open
+io.open=function() return nil,'simulated open failure' end
 local fresh=G.account(1,'A').company
 local starting=fresh.vault
 intent(1,'refuel',{litres=10})
 T.check(fresh.vault==starting-18,'write failure keeps accepted in-memory state')
+io.open=open
 local events={}
 MP.RegisterEvent=function(event,handler) events[event]=handler end
 MP.CreateEventTimer=function() end
@@ -168,5 +186,32 @@ end
 T.check(found,'first pose sends authoritative personal sync')
 BNGE_onLogistics(1,json.encode({type='refuel',opId='wire-fuel',litres=10,cost=0}))
 T.check(sent[#sent].pid==1 and sent[#sent].data.type=='ledger_state' and sent[#sent].data.company.vault==24982,'wire intent decoded and personal authority returned')
+-- Rate limiting counts invalid intents too, before any account/ledger writes.
+clock=clock+1; G.now=function() return clock end
+local priorRev=G.ledger.rev
+for i=1,20 do
+  T.check(G.onLogistics(1,{type='set_company_name',name='Rate',opId='rate-'..i},'A')~=nil,'within rate limit '..i)
+end
+T.check(G.onLogistics(2,{type='sync_request'},'B')~=nil,'rate limits independent per identity')
+local rev=G.ledger.rev
+T.check(not G.onLogistics(1,{type='set_company_name',name='Flood',opId='flood'},'A') and G.ledger.rev==rev,'21st intent rejected without write')
+clock=clock+1
+T.check(G.onLogistics(1,{type='set_company_name',name='Next',opId='next'},'A')~=nil,'new rate window accepted')
+for i=1,210 do intent(1,'set_company_name',{name='Bounded'},'bounded-'..i) end
+local account=G.account(1,'A'); local count=0
+for _ in pairs(account.ops) do count=count+1 end
+T.check(count==200 and #account.opOrder==200 and not account.ops['bounded-1'],'operation history capped at 200')
+rev=G.ledger.rev
+local recent=intent(1,'set_company_name',{name='Must not apply'},'bounded-210')
+T.check(recent and recent.opId=='bounded-210' and G.ledger.rev==rev and account.company.name=='Bounded','recent replay returns result without mutation')
+G=dofile(plugin..'main.lua'); G.now=function() return clock end
+T.check(intent(1,'set_company_name',{name='Must not apply'},'bounded-210')~=nil and G.account(1,'A').company.name=='Bounded','capped history replays after restart')
+local migrated=G.account(1,'A')
+migrated.opOrder=nil
+for i=1,250 do migrated.ops['legacy-'..i]={type='ledger_state',rev=i} end
+G.saveLedger(); G=dofile(plugin..'main.lua')
+local retained=0
+for _ in pairs(G.account(1,'A').ops) do retained=retained+1 end
+T.check(retained==200,'legacy operation maps capped on load')
 os.remove(OTBT_LEDGER_PATH); os.remove(OTBT_LEDGER_PATH..'.bad'); os.remove(OTBT_LEDGER_PATH..'.tmp')
 T.done('test_beammp_ledger')

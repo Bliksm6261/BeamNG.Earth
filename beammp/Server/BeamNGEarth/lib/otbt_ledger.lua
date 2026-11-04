@@ -2,6 +2,27 @@
 return function(G, economy, json)
   local function fresh() return { rev=0, players={}, contracts={}, paid={}, expeditions={} } end
   local function copy(t) return json.decode(json.encode(t)) end
+  G.now = G.now or os.time
+  G.MAX_OPS = 200
+  G.INTENTS_PER_SECOND = 20
+  local rates = {}
+  local function trimOps(p)
+    local order, seen, missing = {}, {}, {}
+    for _, op in ipairs(type(p.opOrder)=='table' and p.opOrder or {}) do
+      if type(op)=='string' and p.ops[op] and not seen[op] then
+        order[#order+1]=op; seen[op]=true
+      end
+    end
+    for op in pairs(p.ops) do if not seen[op] then missing[#missing+1]=op end end
+    table.sort(missing, function(a,b)
+      local ar,br=tonumber(p.ops[a].rev) or 0,tonumber(p.ops[b].rev) or 0
+      if ar~=br then return ar<br end
+      return a<b
+    end)
+    for _, op in ipairs(missing) do order[#order+1]=op end
+    while #order>G.MAX_OPS do p.ops[table.remove(order,1)]=nil end
+    p.opOrder=order
+  end
   G.economy = economy
   G.encode = function(t) return (Util and Util.JsonEncode or json.encode)(t) end
   G.decode = function(s) return (Util and Util.JsonDecode or json.decode)(s) end
@@ -41,14 +62,28 @@ return function(G, economy, json)
       for _, paid in pairs(v.paid) do if paid~=true then ok=false end end
       if v.expeditions~=nil and type(v.expeditions)~='table' then ok=false end
 
-      if ok then v.expeditions=v.expeditions or {}; G.ledger=v; return end
+      if ok then
+        for _, p in pairs(v.players) do trimOps(p) end
+        v.expeditions=v.expeditions or {}; G.ledger=v; return
+      end
     end
     local renamed, err=os.rename(G.LEDGER_PATH, G.LEDGER_PATH..'.bad')
     print('[OTBT] corrupt ledger; starting fresh' .. (renamed and '' or ': backup failed '..tostring(err)))
   end
+  local function ensureDirectory(path)
+    local dir = path:match('^(.*)[/\\]')
+    if not dir or dir == '' then return end
+    if FS and FS.CreateDirectory then
+      local ok, result = pcall(FS.CreateDirectory, dir)
+      if ok and result ~= false then return end
+    end
+    -- Shell quote the entire path; never interpolate an unquoted override.
+    if os.execute then os.execute("mkdir -p -- '" .. dir:gsub("'", "'\\''") .. "'") end
+  end
   function G.saveLedger()
     G.ledger.rev=G.ledger.rev+1
     local ok, err=pcall(function()
+      ensureDirectory(G.LEDGER_PATH)
       local encoded=G.encode(G.ledger)
       local f=assert(io.open(G.LEDGER_PATH..'.tmp', 'w'))
       local wrote, why=f:write(encoded); local closed, reason=f:close()
@@ -96,9 +131,15 @@ return function(G, economy, json)
   function G.onLogistics(pid, msg, name)
     if type(msg)~='table' or type(msg.type)~='string' then return reject('invalid message') end
     name=name or ('Player '..tostring(pid))
-    local p,key=G.account(pid,name)
+    local key=G.playerKey(pid,name)
+    local now=G.now()
+    local rate=rates[key]
+    if not rate or rate.window~=math.floor(now) then rate={window=math.floor(now),count=0}; rates[key]=rate end
+    rate.count=rate.count+1
+    if rate.count>G.INTENTS_PER_SECOND then return reject('rate limit') end
+    local p=G.account(pid,name)
     local comp=p.company
-    local epoch=math.floor(os.time()/3600)
+    local epoch=math.floor(G.now()/3600)
     if msg.type=='sync_request' then
       local state=G.ledgerState(pid,name)
       return {type='sync_state',state={company=state.company,activeContract=state.contract,
@@ -106,7 +147,7 @@ return function(G, economy, json)
     end
     if msg.type=='cb_radio' then
       return {type='cb_radio',channel=tonumber(msg.channel) or 19,callsign=tostring(msg.callsign or name):sub(1,64),
-        message=tostring(msg.message or ''):sub(1,512),code=tostring(msg.code or ''):sub(1,32),time=os.time(),playerName=name,pid=pid},-1
+        message=tostring(msg.message or ''):sub(1,512),code=tostring(msg.code or ''):sub(1,32),time=G.now(),playerName=name,pid=pid},-1
     end
     if type(msg.opId)~='string' or #msg.opId<1 or #msg.opId>128 then return reject('opId required') end
     if p.ops[msg.opId] then return copy(p.ops[msg.opId]),pid end
@@ -139,6 +180,13 @@ return function(G, economy, json)
       return true
     end
     local t=msg.type
+    if t=='accept' or t=='claim' then
+      for _, contract in pairs(G.ledger.contracts) do
+        for _, slot in ipairs(contract.slots) do
+          if slot.status=='claimed' and slot.claimedKey==key then return reject('already holding a slot') end
+        end
+      end
+    end
     if t=='set_company_name' then
       if type(msg.name)~='string' then return reject('invalid name') end
       local clean=msg.name:gsub('[%z\1-\31\127]', ''):sub(1,64)
@@ -149,7 +197,7 @@ return function(G, economy, json)
       for _, u in ipairs(economy.UPGRADES) do if u.id==msg.upgradeId then up=u end end
       if not up or comp.upgrades[up.id] then return reject('unknown or owned upgrade') end
       if comp.vault<up.cost then return reject('insufficient funds') end
-      comp.vault=comp.vault-up.cost; comp.upgrades[up.id]={cost=up.cost,purchasedAt=os.time()}
+      comp.vault=comp.vault-up.cost; comp.upgrades[up.id]={cost=up.cost,purchasedAt=G.now()}
     elseif t=='refuel' then
       if not msg.litres or msg.litres<=0 or msg.litres>economy.FUEL_CAP then return reject('invalid litres') end
       local cost=math.floor(msg.litres*economy.FUEL_PRICE)
@@ -180,14 +228,15 @@ return function(G, economy, json)
       if not c or c.locked then return reject('unknown or locked job') end
       idx=idx or 1; s=c.slots[idx]
       if not s then return reject('invalid slot') end
-      c.owner=key; c.status='in_transit'; c.acceptedAt=os.time()
-      s.status='claimed'; s.claimedKey=key; s.claimedBy=name; s.claimedPid=pid
+      c.owner=key; c.status='in_transit'; c.acceptedAt=G.now()
+      s.status='claimed'; s.claimedAt=G.now(); s.claimedKey=key; s.claimedBy=name; s.claimedPid=pid
       G.ledger.contracts[id]=c; broadcast=true
     elseif t=='claim' then
       if not c or c.status~='in_transit' or not s or s.status~='open' then return reject('slot unavailable') end
-      s.status='claimed'; s.claimedKey=key; s.claimedBy=name; s.claimedPid=pid; broadcast=true
+      s.status='claimed'; s.claimedAt=G.now(); s.claimedKey=key; s.claimedBy=name; s.claimedPid=pid; broadcast=true
     elseif t=='damage' or t=='deliver_slot' then
       if not c or c.status~='in_transit' or not s or s.status~='claimed' or s.claimedKey~=key then return reject('slot ownership or status') end
+      if t=='deliver_slot' and G.now()-(s.claimedAt or G.now())<economy.minimumTransitSeconds(c) then return reject('minimum transit time') end
       if msg.cargoHealth then s.cargoHealth=math.min(s.cargoHealth,math.min(100,msg.cargoHealth)) end
       s.damagePenalty=economy.calculatePenalty(s,c.cargo,G.ledger.players[c.owner].company.upgrades)
       if t=='deliver_slot' then
@@ -232,9 +281,13 @@ return function(G, economy, json)
     result.opId=msg.opId; result.intent=t; result.expeditionId=msg.expeditionId; result.checkpointId=msg.checkpointId
     if t=='purchase_upgrade' then result.jobs=economy.board(epoch,comp.upgrades) end
     p.ops[msg.opId]=copy(result)
+    trimOps(p)
     G.saveLedger()
     if broadcast and MP and MP.TriggerClientEvent then
-      MP.TriggerClientEvent(-1,'bngeLogistics',G.encode({type='slot_state',contract=c,rev=G.ledger.rev}))
+      local public=copy(c)
+      public.owner=nil
+      for _, slot in ipairs(public.slots) do slot.claimedKey=nil end
+      MP.TriggerClientEvent(-1,'bngeLogistics',G.encode({type='slot_state',contract=public,rev=G.ledger.rev}))
       -- Send each affected participant their own company, never another player's vault.
       for other, pose in pairs(G.players) do
         if other~=pid then
