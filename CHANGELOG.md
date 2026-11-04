@@ -2,6 +2,10 @@
 
 What changed in each release of BeamNG.Earth, newest first.
 
+## 1.6.2 beta (2026-11-04)
+
+- Fix BeamMP 3.9.3 plugin loading when the Lua source path has no leading `@`, so the plugin's library modules and ledger use the correct directory.
+
 ## 1.6.1 beta (2026-10-23)
 
 Works with BeamNG.drive 0.40.3.
